@@ -66,9 +66,9 @@ impl Note {
 
     pub fn to_search_result(&self, needle: &String, score: usize) -> String {
         let needle_regex = self.build_needle_regex(needle);
-        let id = CliDisplay::note_id(&self.id);
-        let title = CliDisplay::note_title(&self.title);
-        let formatted_score = CliDisplay::note_score(score);
+        let id = Format::note_id(&self.id);
+        let title = Format::note_title(&self.title);
+        let formatted_score = Format::score(score);
 
         let title_position = self.raw.iter().position(|l| &self.title == l).unwrap() + 1;
         let mut display_number = title_position;
@@ -85,7 +85,7 @@ impl Note {
                     let matched = captures.get(1).map_or("", |m| m.as_str());
                     let previous = self.raw.get(line_id - 1);
                     let next = self.raw.get(line_id + 1);
-                    Some(CliDisplay::note_content_match(display_number, line, matched, previous, next))
+                    Some(Format::search_result(display_number, line, matched, previous, next))
                 }
                 None => None,
             })
@@ -105,7 +105,12 @@ impl Note {
     }
 
     pub fn format_for_list(&self) -> String {
-        format!(" - {} - {}", CliDisplay::note_id(&self.id), CliDisplay::note_title(&self.title))
+        format!(
+            " - {} - {} {}",
+            Format::note_id(&self.id),
+            Format::note_title(&self.title),
+            Format::note_path(&self.path.to_str().unwrap())
+        )
     }
 
     pub fn format_for_write(&self) -> String {
@@ -117,18 +122,10 @@ impl Note {
     }
 }
 
-struct CliDisplay;
+struct Format;
 
-impl CliDisplay {
-    pub fn note_id(id: &usize) -> String {
-        format!("@{}", id.to_string()).green().to_string()
-    }
-
-    pub fn note_title(title: &String) -> String {
-        format!("{}", title.cyan())
-    }
-
-    pub fn note_content_match(line_number: usize, raw_line: &String, matched: &str, previous_raw: Option<&String>, next_raw: Option<&String>) -> String {
+impl Format {
+    pub fn search_result(line_number: usize, raw_line: &String, matched: &str, previous_raw: Option<&String>, next_raw: Option<&String>) -> String {
         let highlight = matched.yellow().to_string();
         let line_nbr_formatted = format!("{}.", line_number.to_string()).dimmed();
         let line = format!("{:2} {}", line_nbr_formatted, raw_line.replace(matched, &highlight));
@@ -139,8 +136,20 @@ impl CliDisplay {
         format!("{}\n{}\n{}\n", previous, line, next)
     }
 
-    pub fn note_score(score: usize) -> String {
+    pub fn score(score: usize) -> String {
         format!("(Score: {})", score.to_string()).dimmed().to_string()
+    }
+
+    pub fn note_id(id: &usize) -> String {
+        format!("@{}", id.to_string()).green().to_string()
+    }
+
+    pub fn note_title(title: &String) -> String {
+        format!("{}", title.cyan())
+    }
+
+    pub fn note_path(path: &str) -> String {
+        format!("({})", path.dimmed())
     }
 }
 

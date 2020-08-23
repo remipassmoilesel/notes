@@ -47,13 +47,17 @@ impl<'a> CommandHandler<'a> {
         }
         self.repository.new_note(&final_path)?;
 
-        self.log.info(format!("Note '{}' created", &final_path));
+        self.log.info(format!("\nNote '{}' created", &final_path));
         Ok(())
     }
 
     fn search(&self, needle: String) -> Result<(), DefaultError> {
         let notes: Vec<Note> = self.repository.get_notes();
-        let mut scored: Vec<(usize, &Note)> = notes.iter().map(|note| (note.match_score(&needle), note)).filter(|(score, _)| score.ne(&0)).collect();
+        let mut scored: Vec<(usize, &Note)> = notes
+            .iter()
+            .map(|note| (note.match_score(&needle), note))
+            .filter(|(score, _)| score.ne(&0))
+            .collect();
         scored.sort_by(|(score_a, _), (score_b, _)| score_b.cmp(&score_a));
         scored
             .iter()

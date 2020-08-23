@@ -1,7 +1,7 @@
 extern crate dirs;
 
-use std::path::PathBuf;
 use crate::env::Env;
+use std::path::PathBuf;
 
 pub const NOTES_STORAGE_DIRECTORY: &str = "NOTES_STORAGE_DIRECTORY";
 
@@ -38,8 +38,8 @@ mod tests {
     use super::*;
     use crate::env::MockEnv;
     use mockall::predicate::*;
-    use std::path::PathBuf;
     use std::env::VarError;
+    use std::path::PathBuf;
 
     #[test]
     fn should_return_path_from_env_var() {

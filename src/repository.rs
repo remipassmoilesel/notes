@@ -1,11 +1,13 @@
+extern crate walkdir;
 use std::fs;
-use std::fs::{DirEntry, File};
+use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
 #[cfg(test)]
 use mockall::automock;
 
+use self::walkdir::{DirEntry, WalkDir};
 use crate::config::Config;
 use crate::default_error::DefaultError;
 use crate::git::Git;
@@ -41,11 +43,9 @@ impl<'a> Repository for RepositoryImpl<'a> {
     fn init(&self) -> Result<(), DefaultError> {
         if !self.config.template_path.exists() {
             fs::create_dir_all(&self.config.storage_directory)?;
-
             self.git.init()?;
 
-            let content = "# Note template\n\nHere we go !\n\n";
-            let note = Note::from(0, self.config.template_path.clone(), content.to_string())?;
+            let note = Note::from(0, self.config.template_path.clone(), "# Note template\n\nHere we go !\n\n".to_string())?;
             self.write_note(&note)?;
             self.git.commit(&note, "Create note template".to_string())?
         }
@@ -76,14 +76,22 @@ impl<'a> Repository for RepositoryImpl<'a> {
         notes.get(id - 1).map(|note| (*note).clone())
     }
 
-    // TODO: use https://docs.rs/walkdir/2.3.1/walkdir/
     fn get_notes(&self) -> Vec<Note> {
-        let ignored_dirs = vec!([".git", ".idea"]);
-        let mut dir_entries: Vec<DirEntry> = fs::read_dir(&self.config.storage_directory)
-            .unwrap()
-            .filter_map(Result::ok)
-            .filter(|file| !ignored_dirs.contains(file.file_name()))
+        let ignored_dirs = vec![".git", ".idea"];
+
+        let mut dir_entries: Vec<DirEntry> = WalkDir::new(&self.config.storage_directory)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let not_ignored = ignored_dirs.iter().find(|dir| e.path().to_str().unwrap().contains(*dir)).is_none();
+                not_ignored
+            })
+            .filter(|e| {
+                let is_markdown = e.path().to_str().unwrap().ends_with(".md");
+                is_markdown
+            })
             .collect();
+
         dir_entries.sort_by(|a, b| a.path().cmp(&b.path()));
 
         let mut index = 0;
@@ -93,10 +101,10 @@ impl<'a> Repository for RepositoryImpl<'a> {
                 index += 1;
                 (index, file)
             })
-            .map(|(index, file)| {
-                let path: PathBuf = file.path();
-                let content = fs::read_to_string(file.path()).unwrap_or(format!("Error while reading file: {}", path.to_str().unwrap()));
-                Note::from(index, path, content)
+            .map(|(index, entry)| {
+                let path = entry.path().to_str().unwrap();
+                let content = fs::read_to_string(path).unwrap_or(format!("Error while reading file: {}", path));
+                Note::from(index, entry.path().to_path_buf(), content)
             })
             .filter_map(Result::ok)
             .collect();

@@ -1,5 +1,5 @@
-use std::env::VarError;
 use std::env;
+use std::env::VarError;
 
 #[cfg(test)]
 use mockall::automock;
@@ -13,7 +13,7 @@ pub struct EnvImpl;
 
 impl EnvImpl {
     pub fn new() -> EnvImpl {
-        EnvImpl{}
+        EnvImpl {}
     }
 }
 

@@ -24,7 +24,7 @@ impl LoggerImpl {
 
 impl Logger for LoggerImpl {
     fn info(&self, message: String) {
-        self.log(format!("{}\n", String::from(message).blue()));
+        self.log(format!("{}\n", String::from(message).cyan()));
     }
 
     fn warn(&self, message: String) {
