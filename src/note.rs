@@ -109,6 +109,7 @@ impl Note {
             " - {} - {} {}",
             Format::note_id(&self.id),
             Format::note_title(&self.title),
+            // TODO: use relative path
             Format::note_path(&self.path.to_str().unwrap())
         )
     }

@@ -70,6 +70,7 @@ impl<'a> CommandHandler<'a> {
         Ok(())
     }
 
+    // TODO: display directories with emojis
     fn list_notes(&self) -> Result<(), DefaultError> {
         let files = self.repository.get_notes();
         for file in files {
@@ -135,7 +136,7 @@ mod tests {
         let mut log_mock = MockLogger::new();
         log_mock
             .expect_info()
-            .with(eq(String::from("Note 'new/note.md' created")))
+            .withf(|out| out.contains("Note 'new/note.md' created"))
             .times(1)
             .returning(|_| ());
 
