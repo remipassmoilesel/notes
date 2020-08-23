@@ -76,11 +76,13 @@ impl<'a> Repository for RepositoryImpl<'a> {
         notes.get(id - 1).map(|note| (*note).clone())
     }
 
+    // TODO: use https://docs.rs/walkdir/2.3.1/walkdir/
     fn get_notes(&self) -> Vec<Note> {
+        let ignored_dirs = vec!([".git", ".idea"]);
         let mut dir_entries: Vec<DirEntry> = fs::read_dir(&self.config.storage_directory)
             .unwrap()
             .filter_map(Result::ok)
-            .filter(|file| file.file_name() != ".git")
+            .filter(|file| !ignored_dirs.contains(file.file_name()))
             .collect();
         dir_entries.sort_by(|a, b| a.path().cmp(&b.path()));
 
