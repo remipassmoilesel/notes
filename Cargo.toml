@@ -1,11 +1,11 @@
 [package]
 edition = "2018"
 name = "notes"
-version = "0.1.9"
+version = "0.2.0"
 authors = ["Rémi Passmoilesel <r.passmoilesel@protonmail.com>"]
-description = "A simple tool for taking notes. Work in progress. See: https://github.com/remipassmoilesel/notes"
+description = "A simple tool for taking notes. Work in progress. See: https://gitlab.com/remipassmoilesel/notes"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/remipassmoilesel/notes.git"
+repository = "https://gitlab.com/remipassmoilesel/notes.git"
 
 [dependencies]
 serde = "1.0.102"

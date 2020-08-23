@@ -27,6 +27,6 @@ With shortcuts:
     $ notes e 123
     $ notes d 123
 
-See https://github.com/remipassmoilesel/notes
+See https://gitlab.com/remipassmoilesel/notes
 
 ";

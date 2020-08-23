@@ -1,7 +1,9 @@
 
 # Notes
 
-A simple tool for taking notes. Work in progress.
+A simple tool for taking notes. Work in progress.   
+
+Main repository is hosted on Gitlab: [https://gitlab.com/remipassmoilesel/notes.git](https://gitlab.com/remipassmoilesel/notes.git)
 
 
 ## Usage
@@ -55,7 +57,7 @@ A simple tool for taking notes. Work in progress.
         $ notes e 123
         $ notes d 123
     
-    See https://github.com/remipassmoilesel/notes
+    See https://gitlab.com/remipassmoilesel/notes
     
 
 ## Build
