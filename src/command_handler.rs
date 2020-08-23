@@ -53,11 +53,11 @@ impl<'a> CommandHandler<'a> {
 
     fn search(&self, needle: String) -> Result<(), DefaultError> {
         let notes: Vec<Note> = self.repository.get_notes();
-        let mut scored: Vec<(usize, &Note)> = notes.iter().map(|note| (note.score(&needle), note)).filter(|(score, _)| score.ne(&0)).collect();
+        let mut scored: Vec<(usize, &Note)> = notes.iter().map(|note| (note.match_score(&needle), note)).filter(|(score, _)| score.ne(&0)).collect();
         scored.sort_by(|(score_a, _), (score_b, _)| score_b.cmp(&score_a));
         scored
             .iter()
-            .map(|(score, note)| note.format_for_search(&needle, *score))
+            .map(|(score, note)| note.to_search_result(&needle, *score))
             .for_each(|search_result| self.log.log(format!("{}", search_result)));
         if scored.is_empty() {
             self.log.info(format!("Nothing found for: {}", needle));

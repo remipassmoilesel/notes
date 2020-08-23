@@ -8,6 +8,7 @@ use crate::command_handler::CommandHandler;
 use crate::command_parser::CommandParser;
 use crate::config::Config;
 use crate::default_error::DefaultError;
+use crate::env::EnvImpl;
 use crate::git::GitImpl;
 use crate::logger::{Logger, LoggerImpl};
 use crate::repository::{Repository, RepositoryImpl};
@@ -18,6 +19,7 @@ mod command_handler;
 mod command_parser;
 mod config;
 mod default_error;
+mod env;
 mod git;
 mod logger;
 mod note;
@@ -35,7 +37,8 @@ fn main() {
     let logger = &logger_impl as &dyn Logger;
 
     logger.log(Banners::small());
-    let config = Config::new();
+    let env = EnvImpl::new();
+    let config = Config::new(&env);
     let result = parse_and_apply_command(&config, logger);
     if result.is_err() {
         terminate(logger, result.unwrap_err())

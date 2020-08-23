@@ -13,9 +13,9 @@ pub struct Note {
     pub path: PathBuf,
     pub title: String,
     /// Contains only non empty lines of note, without title
-    pub content: Vec<String>,
+    pub body: Vec<String>,
     /// Contains all note lines
-    pub raw_content: Vec<String>,
+    pub raw: Vec<String>,
 }
 
 impl Note {
@@ -36,25 +36,25 @@ impl Note {
         }
 
         let title = non_empty_lines.get(0).unwrap().to_string();
-        let content = non_empty_lines.into_iter().skip(1).map(|s| s.to_string()).collect();
+        let body = non_empty_lines.into_iter().skip(1).map(|s| s.to_string()).collect();
 
         Ok(Note {
             id,
             path,
             title,
-            content,
-            raw_content: all_lines,
+            body,
+            raw: all_lines,
         })
     }
 
-    pub fn score(&self, needle: &String) -> usize {
+    pub fn match_score(&self, needle: &String) -> usize {
         let needle_regex = self.build_needle_regex(needle);
         let match_in_title = match needle_regex.is_match(&self.title) {
             true => 4,
             false => 0,
         };
         let match_in_body: usize = self
-            .content
+            .body
             .iter()
             .map(|line| match needle_regex.is_match(line) {
                 true => 1,
@@ -64,42 +64,41 @@ impl Note {
         match_in_title + match_in_body
     }
 
-    pub fn format_for_search(&self, needle: &String, score: usize) -> String {
+    pub fn to_search_result(&self, needle: &String, score: usize) -> String {
         let needle_regex = self.build_needle_regex(needle);
         let id = CliDisplay::note_id(&self.id);
         let title = CliDisplay::note_title(&self.title);
         let formatted_score = CliDisplay::note_score(score);
 
-        let title_position = self.raw_content.iter().position(|l| &self.title == l).unwrap() + 1;
+        let title_position = self.raw.iter().position(|l| &self.title == l).unwrap() + 1;
         let mut display_number = title_position;
         let mut matching_lines: Vec<String> = self
-            .raw_content
+            .raw
             .iter()
             .skip(title_position)
             .map(|line| {
                 display_number += 1;
                 (line, display_number - 1, display_number)
             })
-            .map(|(line, line_id, display_number)| match needle_regex.captures(line) {
+            .filter_map(|(line, line_id, display_number)| match needle_regex.captures(line) {
                 Some(captures) => {
                     let matched = captures.get(1).map_or("", |m| m.as_str());
-                    let previous = self.raw_content.get(line_id - 1);
-                    let next = self.raw_content.get(line_id + 1);
-                    CliDisplay::note_content_match(display_number, line, matched, previous, next)
+                    let previous = self.raw.get(line_id - 1);
+                    let next = self.raw.get(line_id + 1);
+                    Some(CliDisplay::note_content_match(display_number, line, matched, previous, next))
                 }
-                None => "".to_string(),
+                None => None,
             })
-            .filter(|line| !line.is_empty())
             .collect();
 
         // Title can match but not content. In this case we display the first lines of note.
         if score > 0 && matching_lines.len() < 1 {
             let first_lines = 6;
-            let len = match self.content.len() < first_lines {
-                true => self.content.len(),
+            let len = match self.body.len() < first_lines {
+                true => self.body.len(),
                 false => first_lines,
             };
-            matching_lines = self.content[0..len].to_vec();
+            matching_lines = self.body[0..len].to_vec();
         }
 
         format!("\n{} {} {} \n\n{}", id, title, formatted_score, matching_lines.join("\n"))
@@ -110,7 +109,7 @@ impl Note {
     }
 
     pub fn format_for_write(&self) -> String {
-        self.raw_content.join("\n")
+        self.raw.join("\n")
     }
 
     fn build_needle_regex(&self, needle: &String) -> Regex {
@@ -172,28 +171,29 @@ With very interesting things inside
         let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_1.to_string()).unwrap();
         assert_eq!(note.id, 0);
         assert_eq!(note.title, "# SSH");
-        assert_eq!(note.content.len(), 1);
-        assert_eq!(note.content[0], "A note about SSH");
+        assert_eq!(note.body.len(), 1);
+        assert_eq!(note.body[0], "A note about SSH");
         assert_eq!(note.path, PathBuf::from("/tmp/note-1.txt"));
     }
 
     #[test]
-    pub fn score() -> () {
+    pub fn match_score() -> () {
         let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_1.to_string()).unwrap();
-        assert_eq!(note.score(&"ssh".to_string()), 5);
+        assert_eq!(note.match_score(&"ssh".to_string()), 5);
     }
 
     #[test]
-    pub fn format_for_search() -> () {
-        let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_2.to_string()).unwrap();
-        let actual = note.format_for_search(&"rsync".to_string(), 10);
-        let expected = "
-[32m@0[0m [36m# Rsync[0m [2m(Score: 10)[0m 
+    pub fn match_score_should_score_0() -> () {
+        let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_1.to_string()).unwrap();
+        assert_eq!(note.match_score(&"something-else".to_string()), 0);
+    }
 
-   A very interesting note
-[2m4.[0m About [33mRsync[0m
-   With very interesting things inside
-";
+    #[test]
+    pub fn to_search_result() -> () {
+        let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_2.to_string()).unwrap();
+        let actual = note.to_search_result(&"rsync".to_string(), 10);
+        // Pipe
+        let expected = "\n[32m@0[0m [36m# Rsync[0m [2m(Score: 10)[0m \n\n   A very interesting note\n[2m4.[0m About [33mRsync[0m\n   With very interesting things inside\n";
         assert_eq!(actual, expected);
     }
 }
