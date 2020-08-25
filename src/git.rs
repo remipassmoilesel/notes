@@ -3,9 +3,14 @@ use crate::default_error::DefaultError;
 use crate::note::Note;
 use crate::shell::Shell;
 
+#[cfg(test)]
+use mockall::automock;
+
+#[cfg_attr(test, automock)]
 pub trait Git {
     fn init(&self) -> Result<(), DefaultError>;
     fn commit(&self, note: &Note, message: String) -> Result<(), DefaultError>;
+    fn has_changed(&self, note: &Note) -> bool;
     fn push(&self) -> Result<(), DefaultError>;
     fn pull(&self) -> Result<(), DefaultError>;
 }
@@ -30,6 +35,13 @@ impl<'a> Git for GitImpl<'a> {
         let path = &note.path.to_str().unwrap();
         self.shell.execute_in_repo(format!("git add '{}'", path))?;
         self.shell.execute_in_repo(format!("git commit -m '{}' {}", message, path))
+    }
+
+    fn has_changed(&self, note: &Note) -> bool {
+        let path = note.path.to_str().unwrap();
+        self.shell
+            .execute_in_repo(format!("git add {p} && git diff --exit-code HEAD {p} > /dev/null", p = path))
+            .is_err()
     }
 
     fn push(&self) -> Result<(), DefaultError> {

@@ -1,5 +1,5 @@
 .idea
 target
-example-repo
-!example-repo/.gitkeep
+example-repo/.git
+
 

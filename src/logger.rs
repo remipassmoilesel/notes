@@ -7,11 +7,11 @@ use mockall::automock;
 
 #[cfg_attr(test, automock)]
 pub trait Logger {
-    fn info(&self, message: String);
-    fn warn(&self, message: String);
-    fn dimmed(&self, message: String);
-    fn log(&self, message: String);
-    fn error(&self, message: String);
+    fn info(&self, data: &str);
+    fn warn(&self, data: &str);
+    fn dimmed(&self, data: &str);
+    fn log(&self, data: &str);
+    fn error(&self, data: &str);
 }
 
 pub struct LoggerImpl;
@@ -23,23 +23,23 @@ impl LoggerImpl {
 }
 
 impl Logger for LoggerImpl {
-    fn info(&self, message: String) {
-        self.log(format!("{}\n", String::from(message).cyan()));
+    fn info(&self, data: &str) {
+        self.log(&format!("{}\n", data.cyan()));
     }
 
-    fn warn(&self, message: String) {
-        self.log(format!("{}\n", String::from(message).yellow()));
+    fn warn(&self, data: &str) {
+        self.log(&format!("{}\n", data.yellow()));
     }
 
-    fn dimmed(&self, message: String) {
-        self.log(format!("{}\n", String::from(message).dimmed()));
+    fn dimmed(&self, data: &str) {
+        self.log(&format!("{}\n", data.dimmed()));
     }
 
-    fn log(&self, message: String) {
-        println!("{}", message);
+    fn log(&self, data: &str) {
+        println!("{}", data);
     }
 
-    fn error(&self, message: String) {
-        eprint!("{}\n", String::from(message).red());
+    fn error(&self, data: &str) {
+        eprint!("{}\n", data.red());
     }
 }
