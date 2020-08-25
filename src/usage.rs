@@ -1,4 +1,8 @@
-pub const USAGE: &'static str = "
+use crate::PKG_VERSION;
+
+pub fn usage() -> String {
+    format!(
+        "
 Usage:
 
   notes new <path>          Create a new note.
@@ -29,4 +33,9 @@ With shortcuts:
 
 See https://gitlab.com/remipassmoilesel/notes
 
-";
+Version: {pkg_version}
+
+",
+        pkg_version = PKG_VERSION
+    )
+}

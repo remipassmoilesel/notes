@@ -62,10 +62,11 @@ Main repository is hosted on Gitlab: [https://gitlab.com/remipassmoilesel/notes.
 
 ## Build
 
-Install Rust nightly:
+Install Rust nightly and tools:
 
     $ rustup install nightly
     $ rustup default nightly
+    $ cargo install cargo-tarpaulin
 
 
 Build:

@@ -1,13 +1,20 @@
 extern crate regex;
 
+use std::cmp::min;
+use std::fs;
 use std::path::PathBuf;
 
+use lazy_static::lazy_static;
 use regex::{Regex, RegexBuilder};
 
 use crate::default_error::DefaultError;
-use colored::*;
+use crate::search_match::{MatchedLine, SearchMatch};
 
-#[derive(Debug, PartialEq, Clone)]
+lazy_static! {
+    static ref HAS_CONTENT: Regex = RegexBuilder::new("\\w").case_insensitive(true).build().unwrap();
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Note {
     pub id: usize,
     pub path: PathBuf,
@@ -47,8 +54,76 @@ impl Note {
         })
     }
 
-    pub fn match_score(&self, needle: &String) -> usize {
-        let needle_regex = self.build_needle_regex(needle);
+    pub fn from_file(id: usize, path: PathBuf) -> Result<Note, DefaultError> {
+        let content = fs::read_to_string(&path)?;
+        Note::from(id, path, content)
+    }
+
+    pub fn search_match(&self, needle_regex: &Regex) -> SearchMatch {
+        let score = self.match_score(needle_regex);
+        let title_position = self.raw.iter().position(|l| &self.title == l).unwrap();
+        let mut line_index = title_position;
+
+        let mut matching_lines: Vec<MatchedLine> = self
+            .raw
+            .iter()
+            .skip(title_position + 1)
+            .map(|line| {
+                line_index += 1;
+                (line, line_index)
+            })
+            .filter_map(|(line, line_i)| match needle_regex.captures(line) {
+                Some(captures) => {
+                    let matched = String::from(captures.get(1).map_or("", |m| m.as_str()));
+                    let previous: Option<String> = self.raw.get(line_i - 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s));
+                    let next: Option<String> = self.raw.get(line_i + 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s));
+                    Some(MatchedLine {
+                        display_number: line_i + 1,
+                        line_number: line_i,
+                        content: String::from(line),
+                        matched,
+                        previous,
+                        next,
+                    })
+                }
+                None => None,
+            })
+            .collect();
+
+        // Title can match without match in content. In this case we return the first lines of note.
+        if score > 0 && matching_lines.len() < 1 {
+            let show_lines = 6;
+            let first_lines = min(title_position + show_lines, self.raw.len());
+
+            let mut line_index = title_position;
+            matching_lines = self.raw[title_position + 1..first_lines]
+                .iter()
+                .map(|line| {
+                    line_index += 1;
+                    (line, line_index)
+                })
+                .filter(|(line, _)| line.len() > 0)
+                .map(|(line, line_i)| MatchedLine {
+                    display_number: line_i + 1,
+                    line_number: line_i,
+                    content: String::from(line),
+                    matched: "".to_string(),
+                    previous: None,
+                    next: None,
+                })
+                .collect();
+        }
+
+        SearchMatch {
+            id: self.id,
+            score,
+            path: self.path.clone(),
+            title: self.title.clone(),
+            matched_lines: matching_lines,
+        }
+    }
+
+    fn match_score(&self, needle_regex: &Regex) -> usize {
         let match_in_title = match needle_regex.is_match(&self.title) {
             true => 4,
             false => 0,
@@ -64,99 +139,16 @@ impl Note {
         match_in_title + match_in_body
     }
 
-    pub fn to_search_result(&self, needle: &String, score: usize) -> String {
-        let needle_regex = self.build_needle_regex(needle);
-        let id = Format::note_id(&self.id);
-        let title = Format::note_title(&self.title);
-        let formatted_score = Format::score(score);
-
-        let title_position = self.raw.iter().position(|l| &self.title == l).unwrap() + 1;
-        let mut display_number = title_position;
-        let mut matching_lines: Vec<String> = self
-            .raw
-            .iter()
-            .skip(title_position)
-            .map(|line| {
-                display_number += 1;
-                (line, display_number - 1, display_number)
-            })
-            .filter_map(|(line, line_id, display_number)| match needle_regex.captures(line) {
-                Some(captures) => {
-                    let matched = captures.get(1).map_or("", |m| m.as_str());
-                    let previous = self.raw.get(line_id - 1);
-                    let next = self.raw.get(line_id + 1);
-                    Some(Format::search_result(display_number, line, matched, previous, next))
-                }
-                None => None,
-            })
-            .collect();
-
-        // Title can match but not content. In this case we display the first lines of note.
-        if score > 0 && matching_lines.len() < 1 {
-            let first_lines = 6;
-            let len = match self.body.len() < first_lines {
-                true => self.body.len(),
-                false => first_lines,
-            };
-            matching_lines = self.body[0..len].to_vec();
-        }
-
-        format!("\n{} {} {} \n\n{}", id, title, formatted_score, matching_lines.join("\n"))
-    }
-
-    pub fn format_for_list(&self) -> String {
-        format!(
-            " - {} - {} {}",
-            Format::note_id(&self.id),
-            Format::note_title(&self.title),
-            // TODO: use relative path
-            Format::note_path(&self.path.to_str().unwrap())
-        )
-    }
-
-    pub fn format_for_write(&self) -> String {
+    pub fn content(&self) -> String {
         self.raw.join("\n")
-    }
-
-    fn build_needle_regex(&self, needle: &String) -> Regex {
-        RegexBuilder::new(&format!("({})", needle)).case_insensitive(true).build().unwrap()
-    }
-}
-
-struct Format;
-
-impl Format {
-    pub fn search_result(line_number: usize, raw_line: &String, matched: &str, previous_raw: Option<&String>, next_raw: Option<&String>) -> String {
-        let highlight = matched.yellow().to_string();
-        let line_nbr_formatted = format!("{}.", line_number.to_string()).dimmed();
-        let line = format!("{:2} {}", line_nbr_formatted, raw_line.replace(matched, &highlight));
-
-        let spaces: Vec<&str> = line_nbr_formatted.chars().map(|_| " ").collect();
-        let previous = previous_raw.map(|l| format!("{} {}", spaces.join(""), l)).unwrap_or(String::from(""));
-        let next = next_raw.map(|l| format!("{} {}", spaces.join(""), l)).unwrap_or(String::from(""));
-        format!("{}\n{}\n{}\n", previous, line, next)
-    }
-
-    pub fn score(score: usize) -> String {
-        format!("(Score: {})", score.to_string()).dimmed().to_string()
-    }
-
-    pub fn note_id(id: &usize) -> String {
-        format!("@{}", id.to_string()).green().to_string()
-    }
-
-    pub fn note_title(title: &String) -> String {
-        format!("{}", title.cyan())
-    }
-
-    pub fn note_path(path: &str) -> String {
-        format!("({})", path.dimmed())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use regex::{Regex, RegexBuilder};
+    use std::path::PathBuf;
 
     const SAMPLE_NOTE_1: &str = "\
 
@@ -176,9 +168,22 @@ With very interesting things inside
 
 ";
 
+    const SAMPLE_NOTE_3: &str = "\
+
+# What a note !
+
+A very interesting one
+With very interesting things inside
+
+";
+
+    pub fn needle_regexp(needle: &str) -> Regex {
+        RegexBuilder::new(&format!("({})", needle)).case_insensitive(true).build().unwrap()
+    }
+
     #[test]
     pub fn from() -> () {
-        let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_1.to_string()).unwrap();
+        let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_1.to_string()).unwrap();
         assert_eq!(note.id, 0);
         assert_eq!(note.title, "# SSH");
         assert_eq!(note.body.len(), 1);
@@ -188,22 +193,69 @@ With very interesting things inside
 
     #[test]
     pub fn match_score() -> () {
-        let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_1.to_string()).unwrap();
-        assert_eq!(note.match_score(&"ssh".to_string()), 5);
+        let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_1.to_string()).unwrap();
+        let needle_regex = needle_regexp("ssh");
+        assert_eq!(note.match_score(&needle_regex), 5);
     }
 
     #[test]
     pub fn match_score_should_score_0() -> () {
-        let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_1.to_string()).unwrap();
-        assert_eq!(note.match_score(&"something-else".to_string()), 0);
+        let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_1.to_string()).unwrap();
+        let needle_regex = needle_regexp("something-else");
+        assert_eq!(note.match_score(&needle_regex), 0);
     }
 
     #[test]
-    pub fn to_search_result() -> () {
-        let note = Note::from(0, PathBuf::from("/tmp/note-1.txt"), SAMPLE_NOTE_2.to_string()).unwrap();
-        let actual = note.to_search_result(&"rsync".to_string(), 10);
-        // Pipe
-        let expected = "\n[32m@0[0m [36m# Rsync[0m [2m(Score: 10)[0m \n\n   A very interesting note\n[2m4.[0m About [33mRsync[0m\n   With very interesting things inside\n";
+    pub fn search_match() -> () {
+        let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_2.to_string()).unwrap();
+        let needle_regex = needle_regexp("rsync");
+        let actual = note.search_match(&needle_regex);
+        let expected = SearchMatch {
+            id: 0,
+            score: 5,
+            path: "/tmp/note-1.txt".into(),
+            title: "# Rsync".into(),
+            matched_lines: vec![MatchedLine {
+                display_number: 4,
+                line_number: 3,
+                content: "About Rsync".into(),
+                matched: "Rsync".into(),
+                previous: Some("A very interesting note".into()),
+                next: Some("With very interesting things inside".into()),
+            }],
+        };
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    pub fn search_match_only_title() -> () {
+        let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_3.to_string()).unwrap();
+        let needle_regex = needle_regexp("note");
+        let actual = note.search_match(&needle_regex);
+        let expected = SearchMatch {
+            id: 0,
+            score: 4,
+            path: "/tmp/note-1.txt".into(),
+            title: "# What a note !".into(),
+            matched_lines: vec![
+                MatchedLine {
+                    display_number: 3,
+                    line_number: 2,
+                    content: "A very interesting one".into(),
+                    matched: "".to_string(),
+                    previous: None,
+                    next: None,
+                },
+                MatchedLine {
+                    display_number: 4,
+                    line_number: 3,
+                    content: "With very interesting things inside".into(),
+                    matched: "".to_string(),
+                    previous: None,
+                    next: None,
+                },
+            ],
+        };
         assert_eq!(actual, expected);
     }
 }

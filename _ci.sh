@@ -3,6 +3,7 @@
 set -x
 set -e
 
+export RUST_BACKTRACE=1
 export NOTES_STORAGE_DIRECTORY="$(pwd)/example-repo"
 
 cd example-repo && git init && cd ..

@@ -95,7 +95,7 @@ impl CommandParser {
         if let Some(_) = matches.subcommand_matches("help") {
             return Ok(Command::Help);
         }
-        return Err(DefaultError::new(String::from("Bad command, try: $ notes help")));
+        return Err(DefaultError::new("Bad command, try: $ notes help".to_string()));
     }
 }
 

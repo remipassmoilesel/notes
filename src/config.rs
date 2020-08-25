@@ -23,7 +23,7 @@ impl<'a> Config {
 
     fn get_storage_path(env: &'a dyn Env) -> PathBuf {
         let env_path = env.get(NOTES_STORAGE_DIRECTORY).map(|path_str| PathBuf::from(path_str));
-        let mut alternative = dirs::home_dir().unwrap_or(PathBuf::from("/tmp"));
+        let mut alternative = dirs::home_dir().unwrap_or("/tmp".into());
         alternative.push(".notes");
 
         match env_path {
@@ -48,7 +48,7 @@ mod tests {
             .expect_get()
             .with(eq(NOTES_STORAGE_DIRECTORY))
             .times(1)
-            .returning(|_| Ok(String::from("/path/to/dir")));
+            .returning(|_| Ok("/path/to/dir".to_string()));
 
         let config = Config::new(&mock_env);
         assert_eq!(config.storage_directory, PathBuf::from("/path/to/dir"))
