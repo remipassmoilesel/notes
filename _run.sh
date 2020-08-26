@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
-export NOTES_STORAGE_DIRECTORY=/home/remo/linux-utils/notes-repository
+export RUST_BACKTRACE=1
+export NOTES_STORAGE_DIRECTORY=$(pwd)/example-repo
 
 cargo run "$@"
