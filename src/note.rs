@@ -62,24 +62,24 @@ impl Note {
     pub fn search_match(&self, needle_regex: &Regex) -> SearchMatch {
         let score = self.match_score(needle_regex);
         let title_position = self.raw.iter().position(|l| &self.title == l).unwrap();
-        let mut line_index = title_position;
 
         let mut matching_lines: Vec<MatchedLine> = self
             .raw
             .iter()
+            .enumerate()
             .skip(title_position + 1)
-            .map(|line| {
-                line_index += 1;
-                (line, line_index)
-            })
-            .filter_map(|(line, line_i)| match needle_regex.captures(line) {
+            .filter_map(|(idx, line)| match needle_regex.captures(line) {
                 Some(captures) => {
                     let matched = String::from(captures.get(1).map_or("", |m| m.as_str()));
-                    let previous: Option<String> = self.raw.get(line_i - 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s));
-                    let next: Option<String> = self.raw.get(line_i + 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s));
+                    let previous: Option<String> = match idx > 1 {
+                        // Title must not appear in previous line
+                        true => self.raw.get(idx - 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s)),
+                        false => None,
+                    };
+                    let next: Option<String> = self.raw.get(idx + 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s));
                     Some(MatchedLine {
-                        display_number: line_i + 1,
-                        line_number: line_i,
+                        display_number: idx + 1,
+                        line_number: idx,
                         content: String::from(line),
                         matched,
                         previous,
@@ -95,17 +95,16 @@ impl Note {
             let show_lines = 6;
             let first_lines = min(title_position + show_lines, self.raw.len());
 
-            let mut line_index = title_position;
-            matching_lines = self.raw[title_position + 1..first_lines]
+            matching_lines = self
+                .raw
                 .iter()
-                .map(|line| {
-                    line_index += 1;
-                    (line, line_index)
-                })
-                .filter(|(line, _)| line.len() > 0)
-                .map(|(line, line_i)| MatchedLine {
-                    display_number: line_i + 1,
-                    line_number: line_i,
+                .enumerate()
+                .skip(title_position + 1)
+                .take(first_lines)
+                .filter(|(_, line)| HAS_CONTENT.is_match(line))
+                .map(|(idx, line)| MatchedLine {
+                    display_number: idx + 1,
+                    line_number: idx,
                     content: String::from(line),
                     matched: "".to_string(),
                     previous: None,
@@ -146,9 +145,11 @@ impl Note {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use regex::{Regex, RegexBuilder};
     use std::path::PathBuf;
+
+    use regex::{Regex, RegexBuilder};
+
+    use super::*;
 
     const SAMPLE_NOTE_1: &str = "\
 

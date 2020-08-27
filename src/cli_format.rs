@@ -3,7 +3,7 @@ use colored::*;
 use mockall::automock;
 
 use crate::note::Note;
-use crate::search_match::{MatchedLine, SearchMatch};
+use crate::search_match::SearchMatch;
 
 #[cfg_attr(test, automock)]
 pub trait CliFormat {
@@ -30,28 +30,32 @@ impl CliFormat for CliFormatImpl {
         let score = self.match_score(&search_m.score);
         let header = format!("{} {} {} \n", id, title, score);
 
+        let total_match = search_m.matched_lines.len();
         let mut body: Vec<String> = search_m
             .matched_lines
             .iter()
-            .map(|raw_line: &MatchedLine| {
+            .enumerate()
+            .map(|(mnbr, raw_line)| {
                 let match_highlighted = raw_line.matched.yellow().to_string();
                 let line_nbr = format!("{}.", raw_line.display_number).dimmed();
                 let previous_nbr = format!("{}.", raw_line.display_number - 1).dimmed();
                 let next_nbr = format!("{}.", raw_line.display_number + 1).dimmed();
 
-                let previous = &raw_line
-                    .previous
-                    .as_ref()
-                    .map(|l| format!("{} {}\n", previous_nbr, l.dimmed()))
-                    .unwrap_or("".to_string());
-                let next = &raw_line
-                    .next
-                    .as_ref()
-                    .map(|l| format!("\n{} {}", next_nbr, l.dimmed()))
-                    .unwrap_or("".to_string());
+                let previous = &raw_line.previous.as_ref().map(|l| format!("{} {}", previous_nbr, l.dimmed()));
+                let next = &raw_line.next.as_ref().map(|l| format!("{} {}", next_nbr, l.dimmed()));
 
                 let line = format!("{:2} {}", line_nbr, raw_line.content.replace(&raw_line.matched, &match_highlighted));
-                format!("{}{}{}", previous, line, next)
+
+                let is_last = mnbr == total_match - 1;
+                match (previous, next, is_last) {
+                    (Some(p), Some(n), false) => format!("{}\n{}\n{}\n", p, line, n),
+                    (Some(p), Some(n), true) => format!("{}\n{}\n{}", p, line, n),
+                    (Some(p), None, false) => format!("{}\n{}\n", p, line),
+                    (Some(p), None, true) => format!("{}\n{}", p, line),
+                    (None, Some(n), false) => format!("{}\n{}\n", line, n),
+                    (None, Some(n), true) => format!("{}\n{}", line, n),
+                    (None, None, _) => format!("{}", line),
+                }
             })
             .collect();
 
@@ -60,7 +64,7 @@ impl CliFormat for CliFormatImpl {
             body = vec!["... This note is empty ...".to_string()]
         }
 
-        format!("{}{}\n", header, body.join("\n"))
+        format!("{}{}", header, body.join("\n"))
     }
 
     fn note_list_item(&self, note: &Note) -> String {
@@ -87,6 +91,7 @@ impl CliFormat for CliFormatImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::search_match::MatchedLine;
 
     fn init() {
         // We disable colors for test
@@ -123,7 +128,7 @@ mod tests {
 
         let fmt = CliFormatImpl::new();
         let actual = fmt.search_match(&search_m);
-        let expected = "@0 # What a note ! (Score: 4) \n3. A very interesting one\n4. With very interesting things inside\n".to_string();
+        let expected = "@0 # What a note ! (Score: 4) \n3. A very interesting one\n4. With very interesting things inside".to_string();
 
         assert_eq!(actual, expected);
     }
@@ -159,7 +164,7 @@ mod tests {
         let fmt = CliFormatImpl::new();
         let actual = fmt.search_match(&search_m);
         let expected =
-            "@0 # What a note ! (Score: 4) \n2. Previous line 1\n3. A very interesting one\n3. Previous line 2\n4. With very interesting things inside\n"
+            "@0 # What a note ! (Score: 4) \n2. Previous line 1\n3. A very interesting one\n\n3. Previous line 2\n4. With very interesting things inside"
                 .to_string();
 
         assert_eq!(actual, expected);
@@ -196,7 +201,7 @@ mod tests {
         let fmt = CliFormatImpl::new();
         let actual = fmt.search_match(&search_m);
         let expected =
-            "@0 # What a note ! (Score: 4) \n3. A very interesting one\n4. Next line 1\n4. With very interesting things inside\n5. Next line 2\n".to_string();
+            "@0 # What a note ! (Score: 4) \n3. A very interesting one\n4. Next line 1\n\n4. With very interesting things inside\n5. Next line 2".to_string();
 
         assert_eq!(actual, expected);
     }
@@ -231,7 +236,7 @@ mod tests {
 
         let fmt = CliFormatImpl::new();
         let actual = fmt.search_match(&search_m);
-        let expected = "@0 # What a note ! (Score: 4) \n2. Previous line 1\n3. A very interesting one\n4. Next line 1\n3. Previous line 2\n4. With very interesting things inside\n5. Next line 2\n".to_string();
+        let expected = "@0 # What a note ! (Score: 4) \n2. Previous line 1\n3. A very interesting one\n4. Next line 1\n\n3. Previous line 2\n4. With very interesting things inside\n5. Next line 2".to_string();
 
         assert_eq!(actual, expected);
     }
