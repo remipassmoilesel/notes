@@ -9,7 +9,7 @@ license = "GPL-3.0-or-later"
 repository = "https://gitlab.com/remipassmoilesel/notes.git"
 
 [dependencies]
-serde = "1.0.102"
+serde = "1.0.103"
 colored = "1.8.0"
 dirs = "2.0.2"
 chrono = "0.4.9"

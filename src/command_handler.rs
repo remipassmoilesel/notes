@@ -70,7 +70,7 @@ impl<'a> CommandHandler<'a> {
 
         matches
             .iter()
-            .for_each(|search_m| self.log.log(&format!("{}", self.formatter.search_match(search_m))));
+            .for_each(|search_m| self.log.log(&format!("{}\n", self.formatter.search_match(search_m))));
         if matches.is_empty() {
             self.log.info(&format!("Nothing found for: {}", needle));
         }

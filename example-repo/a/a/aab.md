@@ -1,1 +1,1 @@
-# test/assets/sample-repo/a/a/aab.md
+# a/a/aab.md
