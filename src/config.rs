@@ -1,6 +1,6 @@
 extern crate dirs;
 
-use crate::env::Env;
+use crate::env::{Env, EnvImpl};
 use std::path::PathBuf;
 
 pub const NOTES_STORAGE_DIRECTORY: &str = "NOTES_STORAGE_DIRECTORY";
@@ -11,7 +11,7 @@ pub struct Config {
 }
 
 impl<'a> Config {
-    pub fn new(env: &'a dyn Env) -> Config {
+    pub fn new(env: &'a dyn Env) -> Self {
         let storage_directory = Config::get_storage_path(env);
         let template_path: PathBuf = [storage_directory.to_str().unwrap(), ".template.md"].iter().collect();
 
@@ -22,14 +22,20 @@ impl<'a> Config {
     }
 
     fn get_storage_path(env: &'a dyn Env) -> PathBuf {
-        let env_path = env.get(NOTES_STORAGE_DIRECTORY).map(|path_str| PathBuf::from(path_str));
-        let mut alternative = dirs::home_dir().unwrap_or("/tmp".into());
+        let env_path = env.get(NOTES_STORAGE_DIRECTORY).map(PathBuf::from);
+        let mut alternative = dirs::home_dir().unwrap_or_else(|| "/tmp".into());
         alternative.push(".notes");
 
         match env_path {
             Ok(repository_path) => repository_path,
             _ => alternative,
         }
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config::new(&EnvImpl::new())
     }
 }
 

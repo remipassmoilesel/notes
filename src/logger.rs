@@ -17,8 +17,14 @@ pub trait Logger {
 pub struct LoggerImpl;
 
 impl LoggerImpl {
-    pub fn new() -> LoggerImpl {
+    pub fn new() -> Self {
         LoggerImpl {}
+    }
+}
+
+impl Default for LoggerImpl {
+    fn default() -> Self {
+        LoggerImpl::new()
     }
 }
 

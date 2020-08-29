@@ -9,7 +9,7 @@ use mockall::automock;
 #[cfg_attr(test, automock)]
 pub trait Git {
     fn init(&self) -> Result<(), DefaultError>;
-    fn commit(&self, note: &Note, message: String) -> Result<(), DefaultError>;
+    fn commit(&self, note: &Note, message: &str) -> Result<(), DefaultError>;
     fn has_changed(&self, note: &Note) -> bool;
     fn push(&self) -> Result<(), DefaultError>;
     fn pull(&self) -> Result<(), DefaultError>;
@@ -28,27 +28,27 @@ impl<'a> GitImpl<'a> {
 
 impl<'a> Git for GitImpl<'a> {
     fn init(&self) -> Result<(), DefaultError> {
-        self.shell.execute(format!("git init"), &self.config.storage_directory)
+        self.shell.execute("git init", &self.config.storage_directory)
     }
 
-    fn commit(&self, note: &Note, message: String) -> Result<(), DefaultError> {
+    fn commit(&self, note: &Note, message: &str) -> Result<(), DefaultError> {
         let path = &note.path.to_str().unwrap();
-        self.shell.execute_in_repo(format!("git add '{}'", path))?;
-        self.shell.execute_in_repo(format!("git commit -m '{}' {}", message, path))
+        self.shell.execute_in_repo(format!("git add '{}'", path).as_str())?;
+        self.shell.execute_in_repo(format!("git commit -m '{}' {}", message, path).as_str())
     }
 
     fn has_changed(&self, note: &Note) -> bool {
         let path = note.path.to_str().unwrap();
         self.shell
-            .execute_in_repo(format!("git add {p} && git diff --exit-code HEAD {p} > /dev/null", p = path))
+            .execute_in_repo(format!("git add {p} && git diff --exit-code HEAD {p} > /dev/null", p = path).as_str())
             .is_err()
     }
 
     fn push(&self) -> Result<(), DefaultError> {
-        self.shell.execute_in_repo(format!("git push"))
+        self.shell.execute_in_repo("git push")
     }
 
     fn pull(&self) -> Result<(), DefaultError> {
-        self.shell.execute_in_repo(format!("git pull"))
+        self.shell.execute_in_repo("git pull")
     }
 }

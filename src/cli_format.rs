@@ -9,25 +9,31 @@ use crate::search_match::SearchMatch;
 pub trait CliFormat {
     fn search_match(&self, search_m: &SearchMatch) -> String;
     fn note_list_item(&self, note: &Note) -> String;
-    fn match_score(&self, score: &usize) -> String;
-    fn note_id(&self, id: &usize) -> String;
-    fn note_title(&self, title: &String) -> String;
-    fn note_directory(&self, name: &String) -> String;
+    fn match_score(&self, score: usize) -> String;
+    fn note_id(&self, id: usize) -> String;
+    fn note_title(&self, title: &str) -> String;
+    fn note_directory(&self, name: &str) -> String;
 }
 
 pub struct CliFormatImpl;
 
 impl CliFormatImpl {
-    pub fn new() -> CliFormatImpl {
+    pub fn new() -> Self {
         CliFormatImpl {}
+    }
+}
+
+impl Default for CliFormatImpl {
+    fn default() -> Self {
+        CliFormatImpl::new()
     }
 }
 
 impl CliFormat for CliFormatImpl {
     fn search_match(&self, search_m: &SearchMatch) -> String {
-        let id = self.note_id(&search_m.id);
+        let id = self.note_id(search_m.id);
         let title = self.note_title(&search_m.title);
-        let score = self.match_score(&search_m.score);
+        let score = self.match_score(search_m.score);
         let header = format!("{} {} {} \n", id, title, score);
 
         let total_match = search_m.matched_lines.len();
@@ -54,13 +60,13 @@ impl CliFormat for CliFormatImpl {
                     (Some(p), None, true) => format!("{}\n{}", p, line),
                     (None, Some(n), false) => format!("{}\n{}\n", line, n),
                     (None, Some(n), true) => format!("{}\n{}", line, n),
-                    (None, None, _) => format!("{}", line),
+                    (None, None, _) => line,
                 }
             })
             .collect();
 
         // If no match was provided, this is because note is empty, otherwise we have the first lines of note
-        if body.len() < 1 {
+        if body.is_empty() {
             body = vec!["... This note is empty ...".to_string()]
         }
 
@@ -68,22 +74,22 @@ impl CliFormat for CliFormatImpl {
     }
 
     fn note_list_item(&self, note: &Note) -> String {
-        format!(" {} - {}", self.note_id(&note.id), self.note_title(&note.title))
+        format!(" {} - {}", self.note_id(note.id), self.note_title(&note.title))
     }
 
-    fn match_score(&self, score: &usize) -> String {
+    fn match_score(&self, score: usize) -> String {
         format!("(Score: {})", score.to_string()).dimmed().to_string()
     }
 
-    fn note_id(&self, id: &usize) -> String {
+    fn note_id(&self, id: usize) -> String {
         format!("@{}", id).green().to_string()
     }
 
-    fn note_title(&self, title: &String) -> String {
+    fn note_title(&self, title: &str) -> String {
         format!("{}", title.cyan())
     }
 
-    fn note_directory(&self, name: &String) -> String {
+    fn note_directory(&self, name: &str) -> String {
         format!(" 🗁  {}", name)
     }
 }
@@ -99,7 +105,7 @@ mod tests {
     }
 
     #[test]
-    pub fn search_match_no_previous_no_next() -> () {
+    pub fn search_match_no_previous_no_next() {
         init();
         let search_m = SearchMatch {
             id: 0,
@@ -134,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    pub fn search_match_previous_no_next() -> () {
+    pub fn search_match_previous_no_next() {
         init();
         let search_m = SearchMatch {
             id: 0,
@@ -171,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    pub fn search_match_no_previous_next() -> () {
+    pub fn search_match_no_previous_next() {
         init();
         let search_m = SearchMatch {
             id: 0,
@@ -207,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    pub fn search_match_previous_next() -> () {
+    pub fn search_match_previous_next() {
         init();
         let search_m = SearchMatch {
             id: 0,

@@ -1,10 +1,5 @@
-image: registry.gitlab.com/remipassmoilesel/notes:0.1
+image: registry.gitlab.com/remipassmoilesel/notes:0.01
 
-cache:
-  key: global-cache
-  paths:
-    - target
-
-test:cargo:
+test:
   script:
     - ./_ci.sh

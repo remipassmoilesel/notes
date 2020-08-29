@@ -1,6 +1,6 @@
 # TODO
 
-- Use clippy in CI: https://github.com/rust-lang/rust-clippy
-
-
-
+- Move output to main, use it for integration tests
+- More integration tests
+- Better search display
+- Use of a pager for search display ?

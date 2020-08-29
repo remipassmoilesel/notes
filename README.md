@@ -1,7 +1,13 @@
 
 # Notes
 
-A simple tool for taking notes. Work in progress.   
+A simple tool for taking notes. `notes` helps you to keep your notes in a clean directory structure, with Git as versioning.     
+
+Work in progress.     
+
+Prerequisites:
+- Git
+- $EDITOR variable set with the path of your favorite editor
 
 Main repository is hosted on Gitlab: [https://gitlab.com/remipassmoilesel/notes.git](https://gitlab.com/remipassmoilesel/notes.git)
 
@@ -73,3 +79,12 @@ Build:
 
     $ cargo build --release
 
+
+Unit testing:
+
+    $ cargo test --lib
+    
+
+Integration tests need setup:
+
+    $ ./_test.sh
