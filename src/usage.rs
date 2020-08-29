@@ -3,6 +3,7 @@ use crate::PKG_VERSION;
 pub fn usage() -> String {
     format!(
         "
+Version: {pkg_version}
 Usage:
 
   notes new <path>          Create a new note.
@@ -32,8 +33,6 @@ With shortcuts:
     $ notes d 123
 
 See https://gitlab.com/remipassmoilesel/notes
-
-Version: {pkg_version}
 
 ",
         pkg_version = PKG_VERSION
