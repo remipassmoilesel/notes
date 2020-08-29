@@ -1,7 +1,6 @@
 # TODO
 
-- Cards for results, one for chunks, one for note content
-- Finish basics and test all
-- On new note: commit
+- Use clippy in CI: https://github.com/rust-lang/rust-clippy
+
 
 
