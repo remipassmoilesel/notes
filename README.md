@@ -1,6 +1,12 @@
 
 # Notes
 
+<a href="https://gitlab.com/remipassmoilesel/notes/pipelines" style="display: flex; align-items: center;">
+  <img src="https://gitlab.com/remipassmoilesel/notes/badges/master/pipeline.svg" alt="Pipeline status">
+  <img src="https://gitlab.com/remipassmoilesel/notes/badges/master/coverage.svg" alt="coverage report"/>
+</a>
+
+
 A simple tool for taking notes. `notes` helps you to keep your notes in a clean directory structure, with Git as versioning.     
 
 Work in progress.     
