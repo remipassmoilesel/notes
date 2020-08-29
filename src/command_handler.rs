@@ -146,11 +146,11 @@ mod tests {
         let path = "new/note".to_string();
 
         let mut repo_mock = MockRepository::new();
-        repo_mock.expect_load_notes().times(1).returning(|| test_notes());
+        repo_mock.expect_load_notes().times(1).returning(test_notes);
 
         repo_mock
             .expect_new_note()
-            .with(eq(3), eq("new/note.md".to_string()))
+            .with(eq(3), eq("new/note.md"))
             .times(1)
             .returning(|_, _| Ok(test_notes()[0].clone()));
 
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn search_notes_should_find_nothing() {
         let mut repo_mock = MockRepository::new();
-        repo_mock.expect_load_notes().times(1).returning(|| test_notes());
+        repo_mock.expect_load_notes().times(1).returning(test_notes);
 
         let mut log_mock = MockLogger::new();
         log_mock
@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn search_notes_should_find_note() {
         let mut repo_mock = MockRepository::new();
-        repo_mock.expect_load_notes().times(1).returning(|| test_notes());
+        repo_mock.expect_load_notes().times(1).returning(test_notes);
 
         let mut log_mock = MockLogger::new();
         log_mock.expect_log().times(1).withf(|out| out.contains("# Note 2 title")).returning(|_| ());

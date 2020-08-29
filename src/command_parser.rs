@@ -11,7 +11,7 @@ use self::clap::ArgMatches;
 pub struct CommandParser;
 
 impl CommandParser {
-    pub fn new() -> CommandParser {
+    pub fn new() -> Self {
         CommandParser
     }
 
@@ -59,7 +59,7 @@ impl CommandParser {
                 None => return Err(DefaultError::new("You must specify a title".to_string())),
             }
         }
-        if let Some(_) = matches.subcommand_matches("list") {
+        if matches.subcommand_matches("list").is_some() {
             return Ok(Command::List);
         }
         if let Some(cmd_matches) = matches.subcommand_matches("search") {
@@ -86,16 +86,23 @@ impl CommandParser {
                 None => return Err(DefaultError::new("You must specify a note id".to_string())),
             }
         }
-        if let Some(_) = matches.subcommand_matches("pull") {
+        if matches.subcommand_matches("pull").is_some() {
             return Ok(Command::Pull);
         }
-        if let Some(_) = matches.subcommand_matches("push") {
+        if matches.subcommand_matches("push").is_some() {
             return Ok(Command::Push);
         }
-        if let Some(_) = matches.subcommand_matches("help") {
+        if matches.subcommand_matches("help").is_some() {
             return Ok(Command::Help);
         }
-        return Err(DefaultError::new("Bad command, try: $ notes help".to_string()));
+
+        Err(DefaultError::new("Bad command, try: $ notes help".to_string()))
+    }
+}
+
+impl Default for CommandParser {
+    fn default() -> Self {
+        CommandParser::new()
     }
 }
 

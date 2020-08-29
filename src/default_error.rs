@@ -23,7 +23,7 @@ impl Display for DefaultError {
 impl From<std::io::Error> for DefaultError {
     fn from(error: std::io::Error) -> DefaultError {
         DefaultError {
-            message: String::from(error.to_string()),
+            message: error.to_string(),
             backtrace: error.backtrace().map(|bt| format!("{:?}", bt)),
         }
     }
@@ -32,7 +32,7 @@ impl From<std::io::Error> for DefaultError {
 impl From<std::num::ParseIntError> for DefaultError {
     fn from(error: std::num::ParseIntError) -> DefaultError {
         DefaultError {
-            message: String::from(error.to_string()),
+            message: error.to_string(),
             backtrace: error.backtrace().map(|bt| format!("{:?}", bt)),
         }
     }

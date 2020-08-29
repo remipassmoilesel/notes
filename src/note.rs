@@ -27,15 +27,10 @@ pub struct Note {
 
 impl Note {
     pub fn from(id: usize, path: PathBuf, raw_content: String) -> Result<Note, DefaultError> {
-        let all_lines: Vec<String> = raw_content.split("\n").map(|s| String::from(s)).collect();
+        let all_lines: Vec<String> = raw_content.split('\n').map(String::from).collect();
+        let non_empty_lines: Vec<String> = all_lines.iter().filter(|l| !l.is_empty()).map(String::from).collect();
 
-        let non_empty_lines: Vec<String> = all_lines
-            .iter()
-            .filter(|l| !String::is_empty(&l.to_string()))
-            .map(|l| String::from(l))
-            .collect();
-
-        if non_empty_lines.len() < 1 {
+        if non_empty_lines.is_empty() {
             return Err(DefaultError {
                 message: "Not enough lines".to_string(),
                 backtrace: None,
@@ -43,7 +38,7 @@ impl Note {
         }
 
         let title = non_empty_lines.get(0).unwrap().to_string();
-        let body = non_empty_lines.into_iter().skip(1).map(|s| s.to_string()).collect();
+        let body = non_empty_lines.into_iter().skip(1).collect();
 
         Ok(Note {
             id,
@@ -71,12 +66,12 @@ impl Note {
             .filter_map(|(idx, line)| match needle_regex.captures(line) {
                 Some(captures) => {
                     let matched = String::from(captures.get(1).map_or("", |m| m.as_str()));
-                    let previous: Option<String> = match idx > 1 {
-                        // Title must not appear in previous line
-                        true => self.raw.get(idx - 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s)),
-                        false => None,
+                    let previous: Option<String> = if idx > 1 {
+                        self.raw.get(idx - 1).filter(|s| HAS_CONTENT.is_match(s)).map(String::from)
+                    } else {
+                        None
                     };
-                    let next: Option<String> = self.raw.get(idx + 1).filter(|s| HAS_CONTENT.is_match(s)).map(|s| String::from(s));
+                    let next: Option<String> = self.raw.get(idx + 1).filter(|s| HAS_CONTENT.is_match(s)).map(String::from);
                     Some(MatchedLine {
                         display_number: idx + 1,
                         line_number: idx,
@@ -91,7 +86,7 @@ impl Note {
             .collect();
 
         // Title can match without match in content. In this case we return the first lines of note.
-        if score > 0 && matching_lines.len() < 1 {
+        if score > 0 && matching_lines.is_empty() {
             let show_lines = 6;
             let first_lines = min(title_position + show_lines, self.raw.len());
 
@@ -123,18 +118,8 @@ impl Note {
     }
 
     fn match_score(&self, needle_regex: &Regex) -> usize {
-        let match_in_title = match needle_regex.is_match(&self.title) {
-            true => 4,
-            false => 0,
-        };
-        let match_in_body: usize = self
-            .body
-            .iter()
-            .map(|line| match needle_regex.is_match(line) {
-                true => 1,
-                false => 0,
-            })
-            .sum();
+        let match_in_title = if needle_regex.is_match(&self.title) { 4 } else { 0 };
+        let match_in_body: usize = self.body.iter().map(|line| if needle_regex.is_match(line) { 1 } else { 0 }).sum();
         match_in_title + match_in_body
     }
 
@@ -183,7 +168,7 @@ With very interesting things inside
     }
 
     #[test]
-    pub fn from() -> () {
+    pub fn from() {
         let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_1.to_string()).unwrap();
         assert_eq!(note.id, 0);
         assert_eq!(note.title, "# SSH");
@@ -193,21 +178,30 @@ With very interesting things inside
     }
 
     #[test]
-    pub fn match_score() -> () {
+    pub fn from_title_only() {
+        let note = Note::from(0, "/tmp/note-1.txt".into(), "# Title only".to_string()).unwrap();
+        assert_eq!(note.id, 0);
+        assert_eq!(note.title, "# Title only");
+        assert_eq!(note.body.len(), 0);
+        assert_eq!(note.path, PathBuf::from("/tmp/note-1.txt"));
+    }
+
+    #[test]
+    pub fn match_score() {
         let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_1.to_string()).unwrap();
         let needle_regex = needle_regexp("ssh");
         assert_eq!(note.match_score(&needle_regex), 5);
     }
 
     #[test]
-    pub fn match_score_should_score_0() -> () {
+    pub fn match_score_should_score_0() {
         let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_1.to_string()).unwrap();
         let needle_regex = needle_regexp("something-else");
         assert_eq!(note.match_score(&needle_regex), 0);
     }
 
     #[test]
-    pub fn search_match() -> () {
+    pub fn search_match() {
         let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_2.to_string()).unwrap();
         let needle_regex = needle_regexp("rsync");
         let actual = note.search_match(&needle_regex);
@@ -229,7 +223,7 @@ With very interesting things inside
     }
 
     #[test]
-    pub fn search_match_only_title() -> () {
+    pub fn search_match_only_title() {
         let note = Note::from(0, "/tmp/note-1.txt".into(), SAMPLE_NOTE_3.to_string()).unwrap();
         let needle_regex = needle_regexp("note");
         let actual = note.search_match(&needle_regex);

@@ -1,5 +1,6 @@
 .idea
 target
 example-repo/.git
+example-repo/test
 
 

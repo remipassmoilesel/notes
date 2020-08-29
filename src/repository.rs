@@ -17,7 +17,7 @@ use crate::shell::Shell;
 #[cfg_attr(test, automock)]
 pub trait Repository {
     fn init(&self) -> Result<(), DefaultError>;
-    fn new_note(&self, id: usize, path: &String) -> Result<Note, DefaultError>;
+    fn new_note(&self, id: usize, path: &str) -> Result<Note, DefaultError>;
     fn edit_note(&self, note: &Note) -> Result<(), DefaultError>;
     fn find_note_by_id(&self, id: usize) -> Option<Note>;
     fn load_repository_tree(&self) -> Vec<RepositoryDir>;
@@ -63,13 +63,13 @@ impl<'a> Repository for RepositoryImpl<'a> {
 
             let note = Note::from(0, self.config.template_path.clone(), "# Note template\n\nHere we go !\n\n".to_string())?;
             self.write_note(&note)?;
-            self.git.commit(&note, "Create note template".to_string())?
+            self.git.commit(&note, "Create note template")?
         }
         Ok(())
     }
 
-    fn new_note(&self, id: usize, partial_path: &String) -> Result<Note, DefaultError> {
-        let path: PathBuf = [self.config.storage_directory.to_str().unwrap(), partial_path.as_str()].iter().collect();
+    fn new_note(&self, id: usize, partial_path: &str) -> Result<Note, DefaultError> {
+        let path: PathBuf = [self.config.storage_directory.to_str().unwrap(), partial_path].iter().collect();
 
         if path.exists() {
             return Err(DefaultError::new(format!("Already exists: {}", path.to_str().unwrap())));
@@ -85,11 +85,11 @@ impl<'a> Repository for RepositoryImpl<'a> {
 
     fn edit_note(&self, note: &Note) -> Result<(), DefaultError> {
         let path = note.path.to_str().unwrap();
-        self.shell.execute_in_repo(format!("$EDITOR {}", path))?;
+        self.shell.execute_in_repo(format!("$EDITOR {}", path).as_str())?;
         let file_has_changed = self.git.has_changed(note);
         if file_has_changed {
             let message = format!("Update note {}", note.path.file_name().unwrap().to_str().unwrap());
-            self.git.commit(&note, message)?;
+            self.git.commit(&note, message.as_str())?;
         }
         Ok(())
     }
@@ -144,7 +144,7 @@ impl<'a> Repository for RepositoryImpl<'a> {
                 let mut dir_name = String::from(dir.clone().strip_prefix(&self.config.storage_directory).unwrap().to_str().unwrap());
 
                 // If directory does not have a name, it is the top level directory, so we assign full repository path
-                if dir_name.len() < 1 {
+                if dir_name.is_empty() {
                     dir_name = String::from(self.config.storage_directory.to_str().unwrap());
                 }
 
@@ -171,7 +171,8 @@ impl<'a> Repository for RepositoryImpl<'a> {
     fn delete_note(&self, note: &Note) -> Result<(), DefaultError> {
         let path = &note.path;
         fs::remove_file(path)?;
-        self.git.commit(&note, format!("Delete note {}", path.file_name().unwrap().to_str().unwrap()))
+        let message = format!("Delete note {}", path.file_name().unwrap().to_str().unwrap());
+        self.git.commit(&note, message.as_str())
     }
 
     fn push_repo(&self) -> Result<(), DefaultError> {
@@ -197,7 +198,7 @@ mod tests {
     fn test_root() -> PathBuf {
         let test_root = format!("/tmp/test-{}", Uuid::new_v4());
         let cwd = env::current_dir().unwrap();
-        shell_command(format!("mkdir -p {}", test_root), &cwd).unwrap();
+        shell_command(format!("mkdir -p {}", test_root).as_str(), &cwd).unwrap();
         PathBuf::from(test_root)
     }
 
@@ -205,17 +206,17 @@ mod tests {
         let test_root = test_root();
         let repo_root = PathBuf::from(format!("{}/sample-repo", test_root.to_str().unwrap()));
         let cwd = env::current_dir().unwrap();
-        shell_command(format!("tar -xf test/assets/sample-repo.tar -C {}", test_root.to_str().unwrap()), &cwd).unwrap();
         shell_command(
-            "git config user.email 'test@notes.com' && git config user.name 'Test notes'".to_string(),
-            &repo_root,
+            format!("tar -xf tests/assets/sample-repo.tar -C {}", test_root.to_str().unwrap()).as_str(),
+            &cwd,
         )
         .unwrap();
+        shell_command("git config user.email 'test@notes.com' && git config user.name 'Test notes'", &repo_root).unwrap();
         repo_root
     }
 
     #[test]
-    pub fn init() -> () {
+    pub fn init() {
         let test_root = test_root();
         let repo_path = PathBuf::from(format!("{}/test-a/test-b", test_root.to_str().unwrap()));
         let config = Config {
@@ -242,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    pub fn new_note() -> () {
+    pub fn new_note() {
         let repo_path = sample_repo();
         let config = Config {
             storage_directory: repo_path.clone(),
@@ -252,14 +253,14 @@ mod tests {
         let git = GitImpl::new(&shell, &config);
         let repository = RepositoryImpl::new(&config, &shell, &git);
 
-        let partial_path = &"test-a/test-b/-test-c/test.md".into();
+        let partial_path = "test-a/test-b/-test-c/test.md";
         let result = repository.new_note(99, partial_path);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().title, "# Note template".to_string());
     }
 
     #[test]
-    pub fn new_note_should_fail_if_path_exists() -> () {
+    pub fn new_note_should_fail_if_path_exists() {
         let repo_path = sample_repo();
         let config = Config {
             storage_directory: repo_path.clone(),
@@ -269,7 +270,7 @@ mod tests {
         let git = GitImpl::new(&shell, &config);
         let repository = RepositoryImpl::new(&config, &shell, &git);
 
-        let partial_path = &"test-a/test-b/-test-c/test.md".into();
+        let partial_path = "test-a/test-b/-test-c/test.md";
         let result = repository.new_note(99, partial_path);
         assert!(result.is_ok());
 
@@ -279,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    pub fn edit_note() -> () {
+    pub fn edit_note() {
         let fake_note = Note {
             id: 0,
             title: "Fake note".into(),
@@ -294,21 +295,23 @@ mod tests {
         };
 
         let mut shell_mock = MockShell::new();
+
+        let exp_command = format!("$EDITOR {}", fake_note.path.to_str().unwrap());
         shell_mock
             .expect_execute_in_repo()
             .times(1)
-            .with(eq(format!("$EDITOR {}", fake_note.path.to_str().unwrap())))
+            .withf(move |c| c == exp_command)
             .returning(|_| Ok(()));
 
         let mut git_mock = MockGit::new();
         git_mock.expect_has_changed().times(1).with(eq(fake_note.clone())).returning(|_| true);
+
+        let exp_message = format!("Update note {}", fake_note.path.file_name().unwrap().to_str().unwrap());
+        let exp_note = fake_note.clone();
         git_mock
             .expect_commit()
             .times(1)
-            .with(
-                eq(fake_note.clone()),
-                eq(format!("Update note {}", fake_note.path.file_name().unwrap().to_str().unwrap())),
-            )
+            .withf(move |n, m| n == &exp_note && m == exp_message)
             .returning(|_, _| Ok(()));
 
         let repository = RepositoryImpl::new(&config, &shell_mock, &git_mock);
@@ -318,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    pub fn edit_note_should_not_commit() -> () {
+    pub fn edit_note_should_not_commit() {
         let fake_note = Note {
             id: 0,
             title: "Fake note".into(),
@@ -333,10 +336,12 @@ mod tests {
         };
 
         let mut shell_mock = MockShell::new();
+
+        let exp_command = format!("$EDITOR {}", fake_note.path.to_str().unwrap());
         shell_mock
             .expect_execute_in_repo()
             .times(1)
-            .with(eq(format!("$EDITOR {}", fake_note.path.to_str().unwrap())))
+            .withf(move |c| c == exp_command)
             .returning(|_| Ok(()));
 
         let mut git_mock = MockGit::new();
@@ -349,7 +354,7 @@ mod tests {
     }
 
     #[test]
-    pub fn find_note_by_id() -> () {
+    pub fn find_note_by_id() {
         let repo_path = sample_repo();
         let config = Config {
             storage_directory: repo_path.clone(),
@@ -365,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    pub fn load_repository_tree() -> () {
+    pub fn load_repository_tree() {
         let repo_path = sample_repo();
         let config = Config {
             storage_directory: repo_path.clone(),
@@ -407,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    pub fn load_notes() -> () {
+    pub fn load_notes() {
         let repo_path = sample_repo();
         let config = Config {
             storage_directory: repo_path.clone(),

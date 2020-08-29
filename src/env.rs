@@ -12,8 +12,14 @@ pub trait Env {
 pub struct EnvImpl;
 
 impl EnvImpl {
-    pub fn new() -> EnvImpl {
+    pub fn new() -> Self {
         EnvImpl {}
+    }
+}
+
+impl Default for EnvImpl {
+    fn default() -> Self {
+        EnvImpl::new()
     }
 }
 

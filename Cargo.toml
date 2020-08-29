@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "notes"
-version = "0.2.102"
+version = "0.2.104"
 authors = ["Rémi Passmoilesel <r.passmoilesel@protonmail.com>"]
 description = "A simple tool for taking notes. Work in progress. See: https://gitlab.com/remipassmoilesel/notes"
 readme = "README.md"
