@@ -9,7 +9,7 @@
 
 A simple tool for taking notes. `notes` helps you to keep your notes in a clean directory structure, with Git as versioning.     
 
-Work in progress.     
+Work in progress. Only tested on Arch Linux.     
 
 Prerequisites:
 - Git
