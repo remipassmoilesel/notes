@@ -42,8 +42,9 @@ pub fn shell_command(command: String, current_dir: &PathBuf) -> Result<(), Defau
     // println!("{}", command);
 
     let status_code = shell_command.status()?;
-    match status_code.success() {
-        true => Ok(()),
-        false => Err(DefaultError::new(format!("Exited with code {}", status_code.code().unwrap_or(-1)))),
+    if status_code.success() {
+        Ok(())
+    } else {
+        Err(DefaultError::new(format!("Exited with code {}", status_code.code().unwrap_or(-1))))
     }
 }

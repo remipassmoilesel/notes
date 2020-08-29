@@ -17,7 +17,7 @@ use crate::shell::Shell;
 #[cfg_attr(test, automock)]
 pub trait Repository {
     fn init(&self) -> Result<(), DefaultError>;
-    fn new_note(&self, id: usize, path: &String) -> Result<Note, DefaultError>;
+    fn new_note(&self, id: usize, path: &str) -> Result<Note, DefaultError>;
     fn edit_note(&self, note: &Note) -> Result<(), DefaultError>;
     fn find_note_by_id(&self, id: usize) -> Option<Note>;
     fn load_repository_tree(&self) -> Vec<RepositoryDir>;
@@ -68,8 +68,8 @@ impl<'a> Repository for RepositoryImpl<'a> {
         Ok(())
     }
 
-    fn new_note(&self, id: usize, partial_path: &String) -> Result<Note, DefaultError> {
-        let path: PathBuf = [self.config.storage_directory.to_str().unwrap(), partial_path.as_str()].iter().collect();
+    fn new_note(&self, id: usize, partial_path: &str) -> Result<Note, DefaultError> {
+        let path: PathBuf = [self.config.storage_directory.to_str().unwrap(), partial_path].iter().collect();
 
         if path.exists() {
             return Err(DefaultError::new(format!("Already exists: {}", path.to_str().unwrap())));
@@ -144,7 +144,7 @@ impl<'a> Repository for RepositoryImpl<'a> {
                 let mut dir_name = String::from(dir.clone().strip_prefix(&self.config.storage_directory).unwrap().to_str().unwrap());
 
                 // If directory does not have a name, it is the top level directory, so we assign full repository path
-                if dir_name.len() < 1 {
+                if dir_name.is_empty() {
                     dir_name = String::from(self.config.storage_directory.to_str().unwrap());
                 }
 
