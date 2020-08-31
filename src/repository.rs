@@ -9,6 +9,7 @@ use mockall::automock;
 
 use self::walkdir::{DirEntry, WalkDir};
 use crate::config::Config;
+use crate::console_output::ConsoleOutput;
 use crate::default_error::DefaultError;
 use crate::git::Git;
 use crate::note::Note;
@@ -16,16 +17,15 @@ use crate::shell::Shell;
 
 #[cfg_attr(test, automock)]
 pub trait Repository {
-    fn init(&self) -> Result<(), DefaultError>;
+    fn init(&self) -> Result<ConsoleOutput, DefaultError>;
     fn new_note(&self, id: usize, path: &str) -> Result<Note, DefaultError>;
-    fn edit_note(&self, note: &Note) -> Result<(), DefaultError>;
+    fn edit_note(&self, note: &Note) -> Result<ConsoleOutput, DefaultError>;
     fn find_note_by_id(&self, id: usize) -> Option<Note>;
     fn load_repository_tree(&self) -> Vec<RepositoryDir>;
     fn load_notes(&self) -> Vec<Note>;
-    fn write_note(&self, note: &Note) -> Result<(), DefaultError>;
-    fn delete_note(&self, note: &Note) -> Result<(), DefaultError>;
-    fn push_repo(&self) -> Result<(), DefaultError>;
-    fn pull_repo(&self) -> Result<(), DefaultError>;
+    fn delete_note(&self, note: &Note) -> Result<ConsoleOutput, DefaultError>;
+    fn push_repo(&self) -> Result<ConsoleOutput, DefaultError>;
+    fn pull_repo(&self) -> Result<ConsoleOutput, DefaultError>;
 }
 
 #[derive(Debug)]
@@ -56,16 +56,18 @@ impl<'a> RepositoryImpl<'a> {
 }
 
 impl<'a> Repository for RepositoryImpl<'a> {
-    fn init(&self) -> Result<(), DefaultError> {
+    fn init(&self) -> Result<ConsoleOutput, DefaultError> {
+        let mut output = ConsoleOutput::empty();
         if !self.config.template_path.exists() {
             fs::create_dir_all(&self.config.storage_directory)?;
-            self.git.init()?;
+            output.append(self.git.init()?);
 
             let note = Note::from(0, self.config.template_path.clone(), "# Note template\n\nHere we go !\n\n".to_string())?;
-            self.write_note(&note)?;
-            self.git.commit(&note, "Create note template")?
+            let mut file = File::create(&note.path)?;
+            file.write_all(note.content().as_bytes())?;
+            output.append(self.git.commit(&note, "Create note template")?);
         }
-        Ok(())
+        Ok(output)
     }
 
     fn new_note(&self, id: usize, partial_path: &str) -> Result<Note, DefaultError> {
@@ -83,15 +85,16 @@ impl<'a> Repository for RepositoryImpl<'a> {
         Ok(note)
     }
 
-    fn edit_note(&self, note: &Note) -> Result<(), DefaultError> {
+    fn edit_note(&self, note: &Note) -> Result<ConsoleOutput, DefaultError> {
+        let mut out = ConsoleOutput::empty();
         let path = note.path.to_str().unwrap();
         self.shell.execute_in_repo(format!("$EDITOR {}", path).as_str())?;
         let file_has_changed = self.git.has_changed(note);
         if file_has_changed {
             let message = format!("Update note {}", note.path.file_name().unwrap().to_str().unwrap());
-            self.git.commit(&note, message.as_str())?;
+            out.append(self.git.commit(&note, message.as_str())?);
         }
-        Ok(())
+        Ok(out)
     }
 
     fn find_note_by_id(&self, id: usize) -> Option<Note> {
@@ -162,24 +165,18 @@ impl<'a> Repository for RepositoryImpl<'a> {
         self.load_repository_tree().iter().flat_map(|dir| dir.notes.to_vec()).collect()
     }
 
-    fn write_note(&self, note: &Note) -> Result<(), DefaultError> {
-        let mut file = File::create(&note.path)?;
-        file.write_all(note.content().as_bytes())?;
-        Ok(())
-    }
-
-    fn delete_note(&self, note: &Note) -> Result<(), DefaultError> {
+    fn delete_note(&self, note: &Note) -> Result<ConsoleOutput, DefaultError> {
         let path = &note.path;
         fs::remove_file(path)?;
         let message = format!("Delete note {}", path.file_name().unwrap().to_str().unwrap());
         self.git.commit(&note, message.as_str())
     }
 
-    fn push_repo(&self) -> Result<(), DefaultError> {
+    fn push_repo(&self) -> Result<ConsoleOutput, DefaultError> {
         self.git.push()
     }
 
-    fn pull_repo(&self) -> Result<(), DefaultError> {
+    fn pull_repo(&self) -> Result<ConsoleOutput, DefaultError> {
         self.git.pull()
     }
 }
@@ -189,35 +186,14 @@ mod tests {
     use super::*;
     use crate::git::GitImpl;
     use crate::git::MockGit;
-    use crate::shell::MockShell;
-    use crate::shell::{shell_command, ShellImpl};
+    use crate::shell::ShellImpl;
+    use crate::shell::{CommandOutput, MockShell};
+    use crate::test_env::{new_sample_repo, new_test_root};
     use mockall::predicate::*;
-    use std::env;
-    use uuid::Uuid;
-
-    fn test_root() -> PathBuf {
-        let test_root = format!("/tmp/test-{}", Uuid::new_v4());
-        let cwd = env::current_dir().unwrap();
-        shell_command(format!("mkdir -p {}", test_root).as_str(), &cwd).unwrap();
-        PathBuf::from(test_root)
-    }
-
-    fn sample_repo() -> PathBuf {
-        let test_root = test_root();
-        let repo_root = PathBuf::from(format!("{}/sample-repo", test_root.to_str().unwrap()));
-        let cwd = env::current_dir().unwrap();
-        shell_command(
-            format!("tar -xf tests/assets/sample-repo.tar -C {}", test_root.to_str().unwrap()).as_str(),
-            &cwd,
-        )
-        .unwrap();
-        shell_command("git config user.email 'test@notes.com' && git config user.name 'Test notes'", &repo_root).unwrap();
-        repo_root
-    }
 
     #[test]
     pub fn init() {
-        let test_root = test_root();
+        let test_root = new_test_root();
         let repo_path = PathBuf::from(format!("{}/test-a/test-b", test_root.to_str().unwrap()));
         let config = Config {
             storage_directory: repo_path.clone(),
@@ -226,12 +202,12 @@ mod tests {
         let shell = ShellImpl::new(&config);
 
         let mut git_mock = MockGit::new();
-        git_mock.expect_init().times(1).returning(|| Ok(()));
+        git_mock.expect_init().times(1).returning(|| Ok(ConsoleOutput::empty()));
         git_mock
             .expect_commit()
             .times(1)
             .withf(|n, msg| n.title.contains("Note template") && msg.contains("Create note template"))
-            .returning(|_, _| Ok(()));
+            .returning(|_, _| Ok(ConsoleOutput::empty()));
 
         let repository = RepositoryImpl::new(&config, &shell, &git_mock);
 
@@ -244,13 +220,9 @@ mod tests {
 
     #[test]
     pub fn new_note() {
-        let repo_path = sample_repo();
-        let config = Config {
-            storage_directory: repo_path.clone(),
-            template_path: PathBuf::from(format!("{}/.template.md", &repo_path.to_str().unwrap())),
-        };
+        let config = new_sample_repo();
         let shell = ShellImpl::new(&config);
-        let git = GitImpl::new(&shell, &config);
+        let git = GitImpl::new(&shell);
         let repository = RepositoryImpl::new(&config, &shell, &git);
 
         let partial_path = "test-a/test-b/-test-c/test.md";
@@ -261,13 +233,9 @@ mod tests {
 
     #[test]
     pub fn new_note_should_fail_if_path_exists() {
-        let repo_path = sample_repo();
-        let config = Config {
-            storage_directory: repo_path.clone(),
-            template_path: PathBuf::from(format!("{}/.template.md", &repo_path.to_str().unwrap())),
-        };
+        let config = new_sample_repo();
         let shell = ShellImpl::new(&config);
-        let git = GitImpl::new(&shell, &config);
+        let git = GitImpl::new(&shell);
         let repository = RepositoryImpl::new(&config, &shell, &git);
 
         let partial_path = "test-a/test-b/-test-c/test.md";
@@ -301,7 +269,7 @@ mod tests {
             .expect_execute_in_repo()
             .times(1)
             .withf(move |c| c == exp_command)
-            .returning(|_| Ok(()));
+            .returning(|_| Ok(CommandOutput::default()));
 
         let mut git_mock = MockGit::new();
         git_mock.expect_has_changed().times(1).with(eq(fake_note.clone())).returning(|_| true);
@@ -312,7 +280,7 @@ mod tests {
             .expect_commit()
             .times(1)
             .withf(move |n, m| n == &exp_note && m == exp_message)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _| Ok(ConsoleOutput::empty()));
 
         let repository = RepositoryImpl::new(&config, &shell_mock, &git_mock);
 
@@ -342,7 +310,7 @@ mod tests {
             .expect_execute_in_repo()
             .times(1)
             .withf(move |c| c == exp_command)
-            .returning(|_| Ok(()));
+            .returning(|_| Ok(CommandOutput::default()));
 
         let mut git_mock = MockGit::new();
         git_mock.expect_has_changed().times(1).with(eq(fake_note.clone())).returning(|_| false);
@@ -355,13 +323,9 @@ mod tests {
 
     #[test]
     pub fn find_note_by_id() {
-        let repo_path = sample_repo();
-        let config = Config {
-            storage_directory: repo_path.clone(),
-            template_path: PathBuf::from(format!("{}/.template.md", &repo_path.to_str().unwrap())),
-        };
+        let config = new_sample_repo();
         let shell = ShellImpl::new(&config);
-        let git = GitImpl::new(&shell, &config);
+        let git = GitImpl::new(&shell);
         let repository = RepositoryImpl::new(&config, &shell, &git);
 
         let result = repository.find_note_by_id(2);
@@ -371,13 +335,10 @@ mod tests {
 
     #[test]
     pub fn load_repository_tree() {
-        let repo_path = sample_repo();
-        let config = Config {
-            storage_directory: repo_path.clone(),
-            template_path: PathBuf::from(format!("{}/.template.md", &repo_path.to_str().unwrap())),
-        };
+        let config = new_sample_repo();
+
         let shell = ShellImpl::new(&config);
-        let git = GitImpl::new(&shell, &config);
+        let git = GitImpl::new(&shell);
         let repository = RepositoryImpl::new(&config, &shell, &git);
 
         let result = repository.load_repository_tree();
@@ -389,7 +350,7 @@ mod tests {
                 result.extend(note_paths.iter().cloned());
                 result
             })
-            .map(|p| p.strip_prefix(&repo_path).unwrap().to_str().unwrap())
+            .map(|p| p.strip_prefix(&config.storage_directory).unwrap().to_str().unwrap())
             .collect();
 
         assert_eq!(
@@ -413,20 +374,16 @@ mod tests {
 
     #[test]
     pub fn load_notes() {
-        let repo_path = sample_repo();
-        let config = Config {
-            storage_directory: repo_path.clone(),
-            template_path: PathBuf::from(format!("{}/.template.md", &repo_path.to_str().unwrap())),
-        };
+        let config = new_sample_repo();
         let shell = ShellImpl::new(&config);
-        let git = GitImpl::new(&shell, &config);
+        let git = GitImpl::new(&shell);
         let repository = RepositoryImpl::new(&config, &shell, &git);
 
         let result = repository.load_notes();
         let paths: Vec<&str> = result
             .iter()
             .map(|note| &note.path)
-            .map(|p| p.strip_prefix(&repo_path).unwrap().to_str().unwrap())
+            .map(|p| p.strip_prefix(&config.storage_directory).unwrap().to_str().unwrap())
             .collect();
 
         assert_eq!(

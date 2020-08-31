@@ -2,5 +2,5 @@
 target
 example-repo/.git
 example-repo/test
-
+tarpaulin-report.html
 

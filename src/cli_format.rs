@@ -132,7 +132,7 @@ mod tests {
             ],
         };
 
-        let fmt = CliFormatImpl::new();
+        let fmt = CliFormatImpl::default();
         let actual = fmt.search_match(&search_m);
         let expected = "@0 # What a note ! (Score: 4) \n3. A very interesting one\n4. With very interesting things inside".to_string();
 
@@ -167,7 +167,7 @@ mod tests {
             ],
         };
 
-        let fmt = CliFormatImpl::new();
+        let fmt = CliFormatImpl::default();
         let actual = fmt.search_match(&search_m);
         let expected =
             "@0 # What a note ! (Score: 4) \n2. Previous line 1\n3. A very interesting one\n\n3. Previous line 2\n4. With very interesting things inside"
@@ -204,7 +204,7 @@ mod tests {
             ],
         };
 
-        let fmt = CliFormatImpl::new();
+        let fmt = CliFormatImpl::default();
         let actual = fmt.search_match(&search_m);
         let expected =
             "@0 # What a note ! (Score: 4) \n3. A very interesting one\n4. Next line 1\n\n4. With very interesting things inside\n5. Next line 2".to_string();
@@ -240,10 +240,31 @@ mod tests {
             ],
         };
 
-        let fmt = CliFormatImpl::new();
+        let fmt = CliFormatImpl::default();
         let actual = fmt.search_match(&search_m);
         let expected = "@0 # What a note ! (Score: 4) \n2. Previous line 1\n3. A very interesting one\n4. Next line 1\n\n3. Previous line 2\n4. With very interesting things inside\n5. Next line 2".to_string();
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn note_id() {
+        init();
+        let fmt = CliFormatImpl::default();
+        assert_eq!(fmt.note_id(8), "@8");
+    }
+
+    #[test]
+    fn note_title() {
+        init();
+        let fmt = CliFormatImpl::default();
+        assert_eq!(fmt.note_title("# abcd"), "# abcd");
+    }
+
+    #[test]
+    fn note_directory() {
+        init();
+        let fmt = CliFormatImpl::default();
+        assert_eq!(fmt.note_directory("# abcd"), " 🗁  # abcd");
     }
 }
