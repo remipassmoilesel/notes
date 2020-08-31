@@ -1,63 +1,125 @@
-extern crate notes;
+mod integration_tests {
+    extern crate notes;
 
-use notes::config::Config;
-use notes::logger::LoggerImpl;
-use notes::parse_and_apply_command;
-use std::fs;
-use uuid::Uuid;
+    use uuid::Uuid;
 
-#[test]
-fn bad_command() {
-    let logger = LoggerImpl::default();
-    let config = Config::default();
+    use notes::console_output::ConsoleOutput;
+    use notes::default_error::DefaultError;
+    use notes::parse_and_apply_command;
+    use notes::test_env::new_sample_repo;
 
-    let args = args(vec![]);
-    let res = parse_and_apply_command(args, &config, &logger);
-    assert_eq!(res.unwrap_err().message, "Bad command, try: $ notes help");
-}
+    // TODO: improve tests
 
-#[test]
-fn new_note() {
-    let logger = LoggerImpl::default();
-    let config = Config::default();
+    #[test]
+    fn bad_command() {
+        let config = new_sample_repo();
 
-    let note_path = format!("test/note-{}.md", Uuid::new_v4().to_string());
-    let args = args(vec!["new", note_path.as_str()]);
-    let res = parse_and_apply_command(args, &config, &logger);
-    assert!(res.is_ok());
-    assert_edited(&config, &note_path);
-}
+        let args = fake_args(vec![]);
+        let res: Result<ConsoleOutput, DefaultError> = parse_and_apply_command(args, &config);
+        assert_eq!(res.unwrap_err().message, "Bad command, try: $ notes help");
+    }
 
-#[test]
-fn search() {
-    let logger = LoggerImpl::default();
-    let config = Config::default();
+    #[test]
+    fn help() {
+        let config = new_sample_repo();
 
-    let args = args(vec!["search", "needle"]);
-    let res = parse_and_apply_command(args, &config, &logger);
-    assert!(res.is_ok());
-}
+        let args = fake_args(vec!["help"]);
+        let res = parse_and_apply_command(args, &config).unwrap();
+        assert_eq!(res.stderr, "");
+        assert!(res.stdout.contains("Clean all the brains !"));
+        assert!(res.stdout.contains("Usage:"));
+    }
 
-#[test]
-fn list() {
-    let logger = LoggerImpl::default();
-    let config = Config::default();
+    #[test]
+    fn help_shortcut() {
+        let config = new_sample_repo();
 
-    let args = args(vec!["list"]);
-    let res = parse_and_apply_command(args, &config, &logger);
-    assert!(res.is_ok());
-}
+        let args = fake_args(vec!["h"]);
+        let res = parse_and_apply_command(args, &config).unwrap();
+        assert_eq!(res.stderr, "");
+        assert!(res.stdout.contains("Clean all the brains !"));
+        assert!(res.stdout.contains("Usage:"));
+    }
 
-fn assert_edited(config: &Config, path: &str) {
-    let mut note_path = config.storage_directory.clone();
-    note_path.push(path);
+    #[test]
+    fn search() {
+        let config = new_sample_repo();
 
-    let content = fs::read_to_string(note_path).unwrap();
-    assert_eq!(content, "### File was just edited ###\n");
-}
+        let args = fake_args(vec!["search", "ab"]);
+        let res = parse_and_apply_command(args, &config).unwrap();
+        assert!(res.stdout.contains("2 results found"));
+        assert!(res.stderr.is_empty());
+    }
 
-fn args(args: Vec<&str>) -> Vec<String> {
-    let mut res = vec!["/intergation-test/note".to_string()];
-    args.iter().for_each(|a| res.push(String::from(*a)));
-    res
+    #[test]
+    fn new_note() {
+        let config = new_sample_repo();
+
+        let note_path = format!("test/note-{}.md", Uuid::new_v4().to_string());
+        let args = fake_args(vec!["new", note_path.as_str()]);
+        let res = parse_and_apply_command(args, &config).unwrap();
+        assert!(res.stdout.contains(&format!("Note '{}' created", note_path)));
+        assert!(res.stderr.is_empty());
+    }
+
+    #[test]
+    fn new_already_exists() {
+        let config = new_sample_repo();
+
+        let args = fake_args(vec!["new", "a.md"]);
+        let res = parse_and_apply_command(args, &config).unwrap_err();
+        assert!(res.message.contains("Already exists:"));
+    }
+
+    #[test]
+    fn list() {
+        let config = new_sample_repo();
+
+        let args = fake_args(vec!["list"]);
+        let res = parse_and_apply_command(args, &config);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn edit() {
+        let config = new_sample_repo();
+
+        let args = fake_args(vec!["edit", "2"]);
+        let res = parse_and_apply_command(args, &config);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn edit_non_existing_note() {
+        let config = new_sample_repo();
+
+        let args = fake_args(vec!["edit", "999"]);
+        let res = parse_and_apply_command(args, &config);
+        assert_eq!(res.unwrap_err().message, "Note with id 999 not found.");
+    }
+
+    #[test]
+    fn delete() {
+        let config = new_sample_repo();
+
+        let args = fake_args(vec!["delete", "2"]);
+        let res = parse_and_apply_command(args, &config).unwrap();
+        assert!(res.stdout.contains("Note 2 deleted"));
+        assert!(res.stderr.is_empty());
+    }
+
+    #[test]
+    fn delete_non_existing_note() {
+        let config = new_sample_repo();
+
+        let args = fake_args(vec!["delete", "999"]);
+        let res = parse_and_apply_command(args, &config);
+        assert_eq!(res.unwrap_err().message, "Note with id 999 not found.");
+    }
+
+    fn fake_args(args: Vec<&str>) -> Vec<String> {
+        let mut res = vec!["/intergation-test/note".to_string()];
+        args.iter().for_each(|a| res.push(String::from(*a)));
+        res
+    }
 }

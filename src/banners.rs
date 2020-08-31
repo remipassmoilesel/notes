@@ -11,7 +11,7 @@ impl Banners {
     }
 }
 
-const SMALL_BANNER: &str = "\nNotes 🚀\n";
+const SMALL_BANNER: &str = "\nNotes 🚀\n\n";
 
 const BANNER: &str = "
 ███╗   ██╗ ██████╗ ████████╗███████╗███████╗

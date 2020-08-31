@@ -28,3 +28,20 @@ impl Env for EnvImpl {
         env::var(key)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_return_value() {
+        let env = EnvImpl::new();
+        assert!(env.get("HOME").unwrap().contains('/'))
+    }
+
+    #[test]
+    fn should_not_return_value() {
+        let env = EnvImpl::new();
+        assert!(env.get("NON_EXISTING_VAR").is_err())
+    }
+}

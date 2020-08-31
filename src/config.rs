@@ -13,6 +13,11 @@ pub struct Config {
 impl<'a> Config {
     pub fn new(env: &'a dyn Env) -> Self {
         let storage_directory = Config::get_storage_path(env);
+        Config::from_path(&storage_directory)
+    }
+
+    pub fn from_path(path: &PathBuf) -> Self {
+        let storage_directory = path.clone();
         let template_path: PathBuf = [storage_directory.to_str().unwrap(), ".template.md"].iter().collect();
 
         Config {

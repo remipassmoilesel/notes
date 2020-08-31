@@ -12,6 +12,8 @@ pub trait Logger {
     fn dimmed(&self, data: &str);
     fn log(&self, data: &str);
     fn error(&self, data: &str);
+    fn stdout(&self, data: &str);
+    fn stderr(&self, data: &str);
 }
 
 pub struct LoggerImpl;
@@ -47,5 +49,13 @@ impl Logger for LoggerImpl {
 
     fn error(&self, data: &str) {
         eprint!("{}\n", data.red());
+    }
+
+    fn stdout(&self, data: &str) {
+        print!("{}", data);
+    }
+
+    fn stderr(&self, data: &str) {
+        eprint!("{}", data);
     }
 }

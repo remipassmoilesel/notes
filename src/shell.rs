@@ -1,50 +1,194 @@
 use std::path::PathBuf;
 use std::process::Command;
-
-use crate::config::Config;
-use crate::default_error::DefaultError;
+use std::str;
 
 #[cfg(test)]
 use mockall::automock;
 
+use crate::config::Config;
+use crate::default_error::DefaultError;
+
+#[derive(Debug)]
+pub struct CommandOutput {
+    pub status: i32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+impl CommandOutput {
+    pub fn new(code: i32, stdout: String, stderr: String) -> Self {
+        CommandOutput { status: code, stdout, stderr }
+    }
+}
+
+impl Default for CommandOutput {
+    fn default() -> Self {
+        CommandOutput::new(0, "".to_string(), "".to_string())
+    }
+}
+
 #[cfg_attr(test, automock)]
 pub trait Shell {
-    fn execute_in_repo(&self, command: &str) -> Result<(), DefaultError>;
-    fn execute(&self, command: &str, current_dir: &PathBuf) -> Result<(), DefaultError>;
+    /// Execute specified command in user shell
+    /// If command succeed, return a CommandOutput
+    /// If command fail, return an error
+    /// If command cannot be run, return an error
+    fn execute_in_repo(&self, command: &str) -> Result<CommandOutput, DefaultError>;
+
+    /// Execute specified command in user shell
+    /// If command succeed, return a CommandOutput
+    /// If command fail, return an error
+    /// If command cannot be run, return an error
+    fn execute(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError>;
 }
 
 #[derive(Clone)]
 pub struct ShellImpl<'a> {
     config: &'a Config,
+    executor: fn(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError>,
 }
 
 impl<'a> ShellImpl<'a> {
     pub fn new(config: &'a Config) -> ShellImpl {
-        ShellImpl { config }
+        ShellImpl {
+            config,
+            executor: shell_command,
+        }
     }
 }
 
 impl<'a> Shell for ShellImpl<'a> {
-    fn execute_in_repo(&self, command: &str) -> Result<(), DefaultError> {
+    fn execute_in_repo(&self, command: &str) -> Result<CommandOutput, DefaultError> {
         self.execute(command, &self.config.storage_directory)
     }
 
-    fn execute(&self, command: &str, current_dir: &PathBuf) -> Result<(), DefaultError> {
-        shell_command(command, current_dir)
+    fn execute(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
+        match (self.executor)(command, current_dir) {
+            Ok(o) if o.status == 0 => Ok(o),
+            Ok(o) if o.status != 0 => Err(DefaultError::new(format!(
+                "Command failed: '{}'\nExit code='{}'\nstdout='{}'\nstderr='{}'",
+                command, o.status, o.stdout, o.stderr
+            ))),
+            Ok(_) => Err(DefaultError::new(String::from("Unexpected return value"))),
+            Err(e) => Err(e),
+        }
     }
 }
 
-pub fn shell_command(command: &str, current_dir: &PathBuf) -> Result<(), DefaultError> {
-    let mut shell_command = Command::new("sh");
-    shell_command.args(&["-c", command]);
-    shell_command.current_dir(current_dir);
+/// Execute specified command in user shell
+/// If command succeed, return a CommandOutput
+/// If command fail, return a CommandOutput
+/// If command cannot be run, return an error
+pub fn shell_command(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
+    let mut s_comm = Command::new("sh");
+    s_comm.args(&["-c", command]);
+    s_comm.current_dir(current_dir);
 
     // println!("{}", command);
 
-    let status_code = shell_command.status()?;
-    if status_code.success() {
-        Ok(())
+    if let Ok(out) = s_comm.output() {
+        let stderr = str::from_utf8(&out.stderr[..]).unwrap_or_else(|_| "Bad stderr");
+        let stdout = str::from_utf8(&out.stdout[..]).unwrap_or_else(|_| "Bad stdout");
+        Ok(CommandOutput::new(
+            out.status.code().unwrap_or_else(|| -1),
+            String::from(stdout),
+            String::from(stderr),
+        ))
     } else {
-        Err(DefaultError::new(format!("Exited with code {}", status_code.code().unwrap_or(-1))))
+        Err(DefaultError::new(format!("Cannot run command '{}'", command)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+
+    #[test]
+    pub fn new_command_output() {
+        let res = CommandOutput::new(5, "out".to_string(), "err".to_string());
+        assert_eq!(res.status, 5);
+        assert_eq!(res.stdout, "out");
+        assert_eq!(res.stderr, "err");
+    }
+
+    #[test]
+    pub fn correct_command() {
+        let cwd = env::current_dir().unwrap();
+        let res = shell_command("ls Cargo.toml", &cwd).unwrap();
+        assert_eq!(res.status, 0);
+        assert_eq!(res.stdout, "Cargo.toml\n");
+        assert_eq!(res.stderr, "");
+    }
+
+    #[test]
+    pub fn bad_command() {
+        let cwd = env::current_dir().unwrap();
+        let res = shell_command("ls non-existing-file", &cwd).unwrap();
+        assert_eq!(res.status, 2);
+        assert_eq!(res.stdout, "");
+        assert!(res.stderr.contains("non-existing-file"));
+    }
+
+    #[test]
+    pub fn execute_correct_command() {
+        let config = Config {
+            storage_directory: PathBuf::from("/storage"),
+            template_path: PathBuf::from("/template.md"),
+        };
+        fn executor(c: &str, p: &PathBuf) -> Result<CommandOutput, DefaultError> {
+            assert_eq!(p, &PathBuf::from("/storage"));
+            assert_eq!(c, "test-command");
+            Ok(CommandOutput {
+                status: 0,
+                stderr: "err".to_string(),
+                stdout: "out".to_string(),
+            })
+        }
+        let shell = ShellImpl { config: &config, executor };
+
+        let res = shell.execute_in_repo("test-command").unwrap();
+        assert_eq!(res.status, 0);
+        assert_eq!(res.stderr, "err");
+        assert_eq!(res.stdout, "out");
+    }
+
+    #[test]
+    pub fn execute_bad_command() {
+        let config = Config {
+            storage_directory: PathBuf::from("/storage"),
+            template_path: PathBuf::from("/template.md"),
+        };
+        fn executor(c: &str, p: &PathBuf) -> Result<CommandOutput, DefaultError> {
+            assert_eq!(p, &PathBuf::from("/storage"));
+            assert_eq!(c, "test-command");
+            Ok(CommandOutput {
+                status: 1,
+                stderr: "err".to_string(),
+                stdout: "out".to_string(),
+            })
+        }
+        let shell = ShellImpl { config: &config, executor };
+
+        let res = shell.execute_in_repo("test-command").unwrap_err();
+        assert_eq!(res.message, "Command failed: \'test-command\'\nExit code=\'1\'\nstdout=\'out\'\nstderr=\'err\'");
+    }
+
+    #[test]
+    pub fn execute_error() {
+        let config = Config {
+            storage_directory: PathBuf::from("/storage"),
+            template_path: PathBuf::from("/template.md"),
+        };
+        fn executor(c: &str, p: &PathBuf) -> Result<CommandOutput, DefaultError> {
+            assert_eq!(p, &PathBuf::from("/storage"));
+            assert_eq!(c, "test-command");
+            Err(DefaultError::new("test error".to_string()))
+        }
+        let shell = ShellImpl { config: &config, executor };
+
+        let res = shell.execute_in_repo("test-command").unwrap_err();
+        assert_eq!(res.message, "test error");
     }
 }
