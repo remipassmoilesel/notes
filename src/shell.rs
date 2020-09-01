@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     pub fn shell_command_interactive_correct_command() {
-        let out = shell_command("ls", &PathBuf::from("/")).unwrap();
+        let out = shell_command_interactive("ls", &PathBuf::from("/")).unwrap();
         assert_eq!(out.status, 0);
         assert!(out.stdout.is_empty());
         assert!(out.stderr.is_empty());
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     pub fn shell_command_interactive_incorrect_command() {
-        let out = shell_command("aaaaa", &PathBuf::from("/")).unwrap();
+        let out = shell_command_interactive("aaaaa", &PathBuf::from("/")).unwrap();
         assert_ne!(out.status, 0);
         assert!(out.stdout.is_empty());
         assert!(out.stderr.is_empty());

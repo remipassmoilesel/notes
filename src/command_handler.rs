@@ -109,7 +109,7 @@ impl<'a> CommandHandler<'a> {
                 out.append(self.repository.edit_note(&n)?);
                 out.append_stdout(&format!("\nNote '{}' edited\n", n.path.to_str().unwrap()));
                 Ok(out)
-            },
+            }
             None => Err(DefaultError::new(format!("Note with id {} not found.", id))),
         }
     }
@@ -121,7 +121,7 @@ impl<'a> CommandHandler<'a> {
                 out.append(self.repository.delete_note(&n)?);
                 out.append_stdout(&format!("\nNote '{}' deleted\n", n.path.to_str().unwrap()));
                 Ok(out)
-            },
+            }
             None => Err(DefaultError::new(format!("Note with id {} not found.", id))),
         }
     }

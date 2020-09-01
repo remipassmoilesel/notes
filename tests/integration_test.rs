@@ -104,7 +104,7 @@ mod integration_tests {
 
         let args = fake_args(vec!["delete", "2"]);
         let res = parse_and_apply_command(args, &config).unwrap();
-        assert!(res.stdout.contains("Note 2 deleted"));
+        assert!(res.stdout.contains("sample-repo/a.md' deleted"));
         assert!(res.stderr.is_empty());
     }
 
