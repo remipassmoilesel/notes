@@ -65,8 +65,8 @@ impl<'a> ShellImpl<'a> {
     pub fn new(config: &'a Config) -> ShellImpl {
         ShellImpl {
             config,
-            executor: shell_command,
-            interactive_executor: shell_command_interactive,
+            executor: command,
+            interactive_executor: command_interactive,
         }
     }
 }
@@ -106,7 +106,7 @@ impl<'a> Shell for ShellImpl<'a> {
 /// If command succeed, return a CommandOutput
 /// If command fail, return a CommandOutput
 /// If command cannot be run, return an error
-pub fn shell_command(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
+pub fn command(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
     let mut s_comm = Command::new("sh");
     s_comm.args(&["-c", command]);
     s_comm.current_dir(current_dir);
@@ -130,7 +130,7 @@ pub fn shell_command(command: &str, current_dir: &PathBuf) -> Result<CommandOutp
 /// If command succeed, return a CommandOutput
 /// If command fail, return a CommandOutput
 /// If command cannot be run, return an error
-pub fn shell_command_interactive(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
+pub fn command_interactive(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
     let mut s_comm = Command::new("sh");
     s_comm.args(&["-c", command]);
     s_comm.current_dir(current_dir);
@@ -160,56 +160,38 @@ mod tests {
 
     #[test]
     pub fn correct_command() {
-        let cwd = env::current_dir().unwrap();
-        let res = shell_command("ls Cargo.toml", &cwd).unwrap();
-        assert_eq!(res.status, 0);
-        assert_eq!(res.stdout, "Cargo.toml\n");
-        assert_eq!(res.stderr, "");
-    }
-
-    #[test]
-    pub fn bad_command() {
-        let cwd = env::current_dir().unwrap();
-        let res = shell_command("ls non-existing-file", &cwd).unwrap();
-        assert_eq!(res.status, 2);
-        assert_eq!(res.stdout, "");
-        assert!(res.stderr.contains("non-existing-file"));
-    }
-
-    #[test]
-    pub fn shell_command_correct_command() {
-        let out = shell_command("ls", &PathBuf::from("/")).unwrap();
+        let out = command("ls", &PathBuf::from("/")).unwrap();
         assert_eq!(out.status, 0);
         assert!(!out.stdout.is_empty());
         assert!(out.stderr.is_empty());
     }
 
     #[test]
-    pub fn shell_command_incorrect_command() {
-        let out = shell_command("aaaaa", &PathBuf::from("/")).unwrap();
+    pub fn incorrect_command() {
+        let out = command("aaaaa", &PathBuf::from("/")).unwrap();
         assert_ne!(out.status, 0);
         assert!(out.stdout.is_empty());
         assert!(!out.stderr.is_empty());
     }
 
     #[test]
-    pub fn shell_command_interactive_correct_command() {
-        let out = shell_command_interactive("ls", &PathBuf::from("/")).unwrap();
+    pub fn interactive_correct_command() {
+        let out = command_interactive("ls", &PathBuf::from("/")).unwrap();
         assert_eq!(out.status, 0);
         assert!(out.stdout.is_empty());
         assert!(out.stderr.is_empty());
     }
 
     #[test]
-    pub fn shell_command_interactive_incorrect_command() {
-        let out = shell_command_interactive("aaaaa", &PathBuf::from("/")).unwrap();
+    pub fn interactive_incorrect_command() {
+        let out = command_interactive("aaaaa", &PathBuf::from("/")).unwrap();
         assert_ne!(out.status, 0);
         assert!(out.stdout.is_empty());
         assert!(out.stderr.is_empty());
     }
 
     #[test]
-    pub fn execute_correct_command() {
+    pub fn shell_impl_execute_correct_command() {
         let config = Config {
             storage_directory: PathBuf::from("/storage"),
             template_path: PathBuf::from("/template.md"),
@@ -226,7 +208,7 @@ mod tests {
         let shell = ShellImpl {
             config: &config,
             executor,
-            interactive_executor: shell_command_interactive,
+            interactive_executor: command_interactive,
         };
 
         let res = shell.execute_in_repo("test-command").unwrap();
@@ -236,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    pub fn execute_bad_command() {
+    pub fn shell_impl_execute_bad_command() {
         let config = Config {
             storage_directory: PathBuf::from("/storage"),
             template_path: PathBuf::from("/template.md"),
@@ -253,7 +235,7 @@ mod tests {
         let shell = ShellImpl {
             config: &config,
             executor,
-            interactive_executor: shell_command_interactive,
+            interactive_executor: command_interactive,
         };
 
         let res = shell.execute_in_repo("test-command").unwrap_err();
@@ -261,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    pub fn execute_error() {
+    pub fn shell_impl_execute_error() {
         let config = Config {
             storage_directory: PathBuf::from("/storage"),
             template_path: PathBuf::from("/template.md"),
@@ -274,7 +256,7 @@ mod tests {
         let shell = ShellImpl {
             config: &config,
             executor,
-            interactive_executor: shell_command_interactive,
+            interactive_executor: command_interactive,
         };
 
         let res = shell.execute_in_repo("test-command").unwrap_err();
@@ -282,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    pub fn execute_interactive_correct_command() {
+    pub fn shell_impl_execute_interactive_correct_command() {
         let config = Config {
             storage_directory: PathBuf::from("/storage"),
             template_path: PathBuf::from("/template.md"),
@@ -298,7 +280,7 @@ mod tests {
         }
         let shell = ShellImpl {
             config: &config,
-            executor: shell_command,
+            executor: command,
             interactive_executor: executor,
         };
 
@@ -309,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    pub fn execute_interactive_bad_command() {
+    pub fn shell_impl_execute_interactive_bad_command() {
         let config = Config {
             storage_directory: PathBuf::from("/storage"),
             template_path: PathBuf::from("/template.md"),
@@ -325,7 +307,7 @@ mod tests {
         }
         let shell = ShellImpl {
             config: &config,
-            executor: shell_command,
+            executor: command,
             interactive_executor: executor,
         };
 
@@ -334,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    pub fn execute_interactive_error() {
+    pub fn shell_impl_execute_interactive_error() {
         let config = Config {
             storage_directory: PathBuf::from("/storage"),
             template_path: PathBuf::from("/template.md"),
@@ -346,7 +328,7 @@ mod tests {
         }
         let shell = ShellImpl {
             config: &config,
-            executor: shell_command,
+            executor: command,
             interactive_executor: executor,
         };
 

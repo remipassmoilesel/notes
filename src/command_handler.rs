@@ -32,10 +32,7 @@ impl<'a> CommandHandler<'a> {
     }
 
     pub fn apply_command(&self, command: Command) -> Result<ConsoleOutput, DefaultError> {
-        let mut out = ConsoleOutput::empty();
-        out.append_stdout(&Banners::small());
-
-        let res = match command {
+        match command {
             Command::New { path } => self.new_note(path),
             Command::List => self.list_notes(),
             Command::Search { needle } => self.search(needle),
@@ -44,9 +41,7 @@ impl<'a> CommandHandler<'a> {
             Command::Push => self.push_repo(),
             Command::Pull => self.pull_repo(),
             Command::Help => self.help(),
-        }?;
-        out.append(res);
-        Ok(out)
+        }
     }
 
     fn new_note(&self, path: String) -> Result<ConsoleOutput, DefaultError> {
