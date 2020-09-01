@@ -9,8 +9,6 @@ use crate::repository::Repository;
 use crate::search_match::SearchMatch;
 use crate::usage::usage;
 
-// TODO: better assertions on output
-
 #[derive(Debug, PartialEq)]
 pub enum Command {
     New { path: String },
@@ -34,10 +32,7 @@ impl<'a> CommandHandler<'a> {
     }
 
     pub fn apply_command(&self, command: Command) -> Result<ConsoleOutput, DefaultError> {
-        let mut out = ConsoleOutput::empty();
-        out.append_stdout(&Banners::small());
-
-        let res = match command {
+        match command {
             Command::New { path } => self.new_note(path),
             Command::List => self.list_notes(),
             Command::Search { needle } => self.search(needle),
@@ -46,9 +41,7 @@ impl<'a> CommandHandler<'a> {
             Command::Push => self.push_repo(),
             Command::Pull => self.pull_repo(),
             Command::Help => self.help(),
-        }?;
-        out.append(res);
-        Ok(out)
+        }
     }
 
     fn new_note(&self, path: String) -> Result<ConsoleOutput, DefaultError> {
@@ -61,7 +54,7 @@ impl<'a> CommandHandler<'a> {
         let note = self.repository.new_note(id, &final_path)?;
         out.append(self.repository.edit_note(&note)?);
 
-        out.append_stdout(&format!("\nNote '{}' created", &final_path));
+        out.append_stdout(&format!("\nNote '{}' created\n", &note.path.to_str().unwrap()));
         Ok(out)
     }
 
@@ -103,21 +96,27 @@ impl<'a> CommandHandler<'a> {
     }
 
     fn edit_note(&self, id: usize) -> Result<ConsoleOutput, DefaultError> {
+        let mut out = ConsoleOutput::empty();
         match self.repository.find_note_by_id(id) {
-            Some(n) => self.repository.edit_note(&n),
+            Some(n) => {
+                out.append(self.repository.edit_note(&n)?);
+                out.append_stdout(&format!("\nNote '{}' edited\n", n.path.to_str().unwrap()));
+                Ok(out)
+            }
             None => Err(DefaultError::new(format!("Note with id {} not found.", id))),
         }
     }
 
     fn delete_note(&self, id: usize) -> Result<ConsoleOutput, DefaultError> {
         let mut out = ConsoleOutput::empty();
-        let deletion = match self.repository.find_note_by_id(id) {
-            Some(n) => self.repository.delete_note(&n),
+        match self.repository.find_note_by_id(id) {
+            Some(n) => {
+                out.append(self.repository.delete_note(&n)?);
+                out.append_stdout(&format!("\nNote '{}' deleted\n", n.path.to_str().unwrap()));
+                Ok(out)
+            }
             None => Err(DefaultError::new(format!("Note with id {} not found.", id))),
-        }?;
-        out.append(deletion);
-        out.append_stdout(&format!("\nNote {} deleted", id));
-        Ok(out)
+        }
     }
 
     fn push_repo(&self) -> Result<ConsoleOutput, DefaultError> {
@@ -141,6 +140,8 @@ impl<'a> CommandHandler<'a> {
         Ok(out)
     }
 }
+
+// TODO: better assertions on output
 
 #[cfg(test)]
 mod tests {

@@ -10,8 +10,9 @@ use crate::console_output::ConsoleOutput;
 use crate::default_error::DefaultError;
 use crate::git::GitImpl;
 use crate::repository::{Repository, RepositoryImpl};
-use crate::shell::{shell_command, ShellImpl};
+use crate::shell::{command, ShellImpl};
 
+pub mod banners;
 pub mod config;
 pub mod console_output;
 pub mod default_error;
@@ -19,7 +20,6 @@ pub mod logger;
 #[doc(hidden)]
 pub mod test_env;
 
-mod banners;
 mod cli_format;
 mod command_handler;
 mod command_parser;
@@ -53,11 +53,11 @@ pub fn parse_and_apply_command(args: Vec<String>, config: &Config) -> Result<Con
 fn check_prerequisites() -> Result<(), DefaultError> {
     assert_exists("sh", "sh must be installed and in path variable")?;
     assert_exists("git", "Git must be installed and in path variable")?;
-    assert_exists("$EDITOR", "$EDITOR variable must be set in your shell")
+    assert_exists("$EDITOR", "EDITOR variable must contains a valid text editor, e.g.:\n\n\texport EDITOR=vim")
 }
 
-fn assert_exists(command: &str, message: &str) -> Result<(), DefaultError> {
-    let cmd = shell_command(format!("which {}", command).as_str(), &PathBuf::from("/"));
+fn assert_exists(cmd: &str, message: &str) -> Result<(), DefaultError> {
+    let cmd = command(format!("which {}", cmd).as_str(), &PathBuf::from("/"));
     match cmd {
         Ok(o) if o.status == 0 => Ok(()),
         Ok(o) if o.status != 0 => Err(DefaultError::new(message.to_string())),
