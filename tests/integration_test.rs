@@ -58,7 +58,7 @@ mod integration_tests {
         let note_path = format!("test/note-{}.md", Uuid::new_v4().to_string());
         let args = fake_args(vec!["new", note_path.as_str()]);
         let res = parse_and_apply_command(args, &config).unwrap();
-        assert!(res.stdout.contains(&format!("Note '{}' created", note_path)));
+        assert!(res.stdout.contains(&format!("{}' created", note_path)));
         assert!(res.stderr.is_empty());
     }
 
@@ -104,7 +104,7 @@ mod integration_tests {
 
         let args = fake_args(vec!["delete", "2"]);
         let res = parse_and_apply_command(args, &config).unwrap();
-        assert!(res.stdout.contains("Note 2 deleted"));
+        assert!(res.stdout.contains("sample-repo/a.md' deleted"));
         assert!(res.stderr.is_empty());
     }
 

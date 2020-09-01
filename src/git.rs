@@ -49,14 +49,14 @@ impl<'a> Git for GitImpl<'a> {
     }
 
     fn push(&self) -> Result<ConsoleOutput, DefaultError> {
-        match self.shell.execute_in_repo("git push") {
+        match self.shell.execute_interactive_in_repo("git push") {
             Ok(o) => Ok(o.into()),
             Err(e) => Err(e),
         }
     }
 
     fn pull(&self) -> Result<ConsoleOutput, DefaultError> {
-        match self.shell.execute_in_repo("git pull") {
+        match self.shell.execute_interactive_in_repo("git pull") {
             Ok(o) => Ok(o.into()),
             Err(e) => Err(e),
         }
@@ -131,7 +131,7 @@ mod tests {
         let mut shell_mock = MockShell::new();
         let exp_command = "git push";
         shell_mock
-            .expect_execute_in_repo()
+            .expect_execute_interactive_in_repo()
             .times(1)
             .withf(move |c| c == exp_command)
             .returning(|_| Ok(CommandOutput::default()));
@@ -145,7 +145,7 @@ mod tests {
         let mut shell_mock = MockShell::new();
         let exp_command = "git pull";
         shell_mock
-            .expect_execute_in_repo()
+            .expect_execute_interactive_in_repo()
             .times(1)
             .withf(move |c| c == exp_command)
             .returning(|_| Ok(CommandOutput::default()));
