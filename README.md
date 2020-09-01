@@ -13,7 +13,7 @@ Work in progress. Only tested on Arch Linux.
 
 Prerequisites:
 - Git
-- $EDITOR variable set with the path of your favorite editor
+- $EDITOR variable set with the path of your favorite editor. Your editor must block while editing.
 
 Main repository is hosted on Gitlab: [https://gitlab.com/remipassmoilesel/notes.git](https://gitlab.com/remipassmoilesel/notes.git)
 

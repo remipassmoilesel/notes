@@ -61,7 +61,7 @@ impl<'a> CommandHandler<'a> {
         let note = self.repository.new_note(id, &final_path)?;
         out.append(self.repository.edit_note(&note)?);
 
-        out.append_stdout(&format!("\nNote '{}' created", &final_path));
+        out.append_stdout(&format!("\nNote '{}' created\n", &final_path));
         Ok(out)
     }
 
@@ -103,21 +103,27 @@ impl<'a> CommandHandler<'a> {
     }
 
     fn edit_note(&self, id: usize) -> Result<ConsoleOutput, DefaultError> {
+        let mut out = ConsoleOutput::empty();
         match self.repository.find_note_by_id(id) {
-            Some(n) => self.repository.edit_note(&n),
+            Some(n) => {
+                out.append(self.repository.edit_note(&n)?);
+                out.append_stdout(&format!("\nNote '{}' edited\n", n.path.to_str().unwrap()));
+                Ok(out)
+            },
             None => Err(DefaultError::new(format!("Note with id {} not found.", id))),
         }
     }
 
     fn delete_note(&self, id: usize) -> Result<ConsoleOutput, DefaultError> {
         let mut out = ConsoleOutput::empty();
-        let deletion = match self.repository.find_note_by_id(id) {
-            Some(n) => self.repository.delete_note(&n),
+        match self.repository.find_note_by_id(id) {
+            Some(n) => {
+                out.append(self.repository.delete_note(&n)?);
+                out.append_stdout(&format!("\nNote '{}' deleted\n", n.path.to_str().unwrap()));
+                Ok(out)
+            },
             None => Err(DefaultError::new(format!("Note with id {} not found.", id))),
-        }?;
-        out.append(deletion);
-        out.append_stdout(&format!("\nNote {} deleted", id));
-        Ok(out)
+        }
     }
 
     fn push_repo(&self) -> Result<ConsoleOutput, DefaultError> {

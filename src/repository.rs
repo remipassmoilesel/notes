@@ -166,9 +166,8 @@ impl<'a> Repository for RepositoryImpl<'a> {
     }
 
     fn delete_note(&self, note: &Note) -> Result<ConsoleOutput, DefaultError> {
-        let path = &note.path;
-        fs::remove_file(path)?;
-        let message = format!("Delete note {}", path.file_name().unwrap().to_str().unwrap());
+        fs::remove_file(&note.path)?;
+        let message = format!("Delete note {}", note.path.to_str().unwrap());
         self.git.commit(&note, message.as_str())
     }
 
