@@ -29,23 +29,36 @@ impl Default for CommandOutput {
 
 #[cfg_attr(test, automock)]
 pub trait Shell {
-    /// Execute specified command in user shell
+    /// Execute specified command in user shell, and capture outputs
+    /// If command succeed, return a CommandOutput
+    /// If command fail, return an error
+    /// If command cannot be run, return an error
+    fn execute(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError>;
+
+    /// Execute specified command in user shell, and capture outputs
     /// If command succeed, return a CommandOutput
     /// If command fail, return an error
     /// If command cannot be run, return an error
     fn execute_in_repo(&self, command: &str) -> Result<CommandOutput, DefaultError>;
 
-    /// Execute specified command in user shell
+    /// Execute specified command in user shell, and capture outputs
     /// If command succeed, return a CommandOutput
     /// If command fail, return an error
     /// If command cannot be run, return an error
-    fn execute(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError>;
+    fn execute_interactive(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError>;
+
+    /// Execute specified command in user shell, and capture outputs
+    /// If command succeed, return a CommandOutput
+    /// If command fail, return an error
+    /// If command cannot be run, return an error
+    fn execute_interactive_in_repo(&self, command: &str) -> Result<CommandOutput, DefaultError>;
 }
 
 #[derive(Clone)]
 pub struct ShellImpl<'a> {
     config: &'a Config,
     executor: fn(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError>,
+    interactive_executor: fn(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError>,
 }
 
 impl<'a> ShellImpl<'a> {
@@ -53,15 +66,12 @@ impl<'a> ShellImpl<'a> {
         ShellImpl {
             config,
             executor: shell_command,
+            interactive_executor: shell_command_interactive,
         }
     }
 }
 
 impl<'a> Shell for ShellImpl<'a> {
-    fn execute_in_repo(&self, command: &str) -> Result<CommandOutput, DefaultError> {
-        self.execute(command, &self.config.storage_directory)
-    }
-
     fn execute(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
         match (self.executor)(command, current_dir) {
             Ok(o) if o.status == 0 => Ok(o),
@@ -73,9 +83,26 @@ impl<'a> Shell for ShellImpl<'a> {
             Err(e) => Err(e),
         }
     }
+
+    fn execute_in_repo(&self, command: &str) -> Result<CommandOutput, DefaultError> {
+        self.execute(command, &self.config.storage_directory)
+    }
+
+    fn execute_interactive(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
+        match (self.interactive_executor)(command, current_dir) {
+            Ok(o) if o.status == 0 => Ok(o),
+            Ok(o) if o.status != 0 => Err(DefaultError::new(format!("Command failed: '{}'\nExit code='{}'\n", command, o.status))),
+            Ok(_) => Err(DefaultError::new(String::from("Unexpected return value"))),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn execute_interactive_in_repo(&self, command: &str) -> Result<CommandOutput, DefaultError> {
+        self.execute_interactive(command, &self.config.storage_directory)
+    }
 }
 
-/// Execute specified command in user shell
+/// Execute specified command in user shell, and capture outputs
 /// If command succeed, return a CommandOutput
 /// If command fail, return a CommandOutput
 /// If command cannot be run, return an error
@@ -94,6 +121,24 @@ pub fn shell_command(command: &str, current_dir: &PathBuf) -> Result<CommandOutp
             String::from(stdout),
             String::from(stderr),
         ))
+    } else {
+        Err(DefaultError::new(format!("Cannot run command '{}'", command)))
+    }
+}
+
+/// Execute specified command in user shell
+/// If command succeed, return a CommandOutput
+/// If command fail, return a CommandOutput
+/// If command cannot be run, return an error
+pub fn shell_command_interactive(command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
+    let mut s_comm = Command::new("sh");
+    s_comm.args(&["-c", command]);
+    s_comm.current_dir(current_dir);
+
+    // println!("{}", command);
+
+    if let Ok(out) = s_comm.status() {
+        Ok(CommandOutput::new(out.code().unwrap_or_else(|| -1), "".to_string(), "".to_string()))
     } else {
         Err(DefaultError::new(format!("Cannot run command '{}'", command)))
     }
@@ -132,6 +177,38 @@ mod tests {
     }
 
     #[test]
+    pub fn shell_command_correct_command() {
+        let out = shell_command("ls", &PathBuf::from("/")).unwrap();
+        assert_eq!(out.status, 0);
+        assert!(!out.stdout.is_empty());
+        assert!(out.stderr.is_empty());
+    }
+
+    #[test]
+    pub fn shell_command_incorrect_command() {
+        let out = shell_command("aaaaa", &PathBuf::from("/")).unwrap();
+        assert_ne!(out.status, 0);
+        assert!(out.stdout.is_empty());
+        assert!(!out.stderr.is_empty());
+    }
+
+    #[test]
+    pub fn shell_command_interactive_correct_command() {
+        let out = shell_command("ls", &PathBuf::from("/")).unwrap();
+        assert_eq!(out.status, 0);
+        assert!(out.stdout.is_empty());
+        assert!(out.stderr.is_empty());
+    }
+
+    #[test]
+    pub fn shell_command_interactive_incorrect_command() {
+        let out = shell_command("aaaaa", &PathBuf::from("/")).unwrap();
+        assert_ne!(out.status, 0);
+        assert!(out.stdout.is_empty());
+        assert!(out.stderr.is_empty());
+    }
+
+    #[test]
     pub fn execute_correct_command() {
         let config = Config {
             storage_directory: PathBuf::from("/storage"),
@@ -146,7 +223,11 @@ mod tests {
                 stdout: "out".to_string(),
             })
         }
-        let shell = ShellImpl { config: &config, executor };
+        let shell = ShellImpl {
+            config: &config,
+            executor,
+            interactive_executor: shell_command_interactive,
+        };
 
         let res = shell.execute_in_repo("test-command").unwrap();
         assert_eq!(res.status, 0);
@@ -169,7 +250,11 @@ mod tests {
                 stdout: "out".to_string(),
             })
         }
-        let shell = ShellImpl { config: &config, executor };
+        let shell = ShellImpl {
+            config: &config,
+            executor,
+            interactive_executor: shell_command_interactive,
+        };
 
         let res = shell.execute_in_repo("test-command").unwrap_err();
         assert_eq!(res.message, "Command failed: \'test-command\'\nExit code=\'1\'\nstdout=\'out\'\nstderr=\'err\'");
@@ -186,9 +271,86 @@ mod tests {
             assert_eq!(c, "test-command");
             Err(DefaultError::new("test error".to_string()))
         }
-        let shell = ShellImpl { config: &config, executor };
+        let shell = ShellImpl {
+            config: &config,
+            executor,
+            interactive_executor: shell_command_interactive,
+        };
 
         let res = shell.execute_in_repo("test-command").unwrap_err();
+        assert_eq!(res.message, "test error");
+    }
+
+    #[test]
+    pub fn execute_interactive_correct_command() {
+        let config = Config {
+            storage_directory: PathBuf::from("/storage"),
+            template_path: PathBuf::from("/template.md"),
+        };
+        fn executor(c: &str, p: &PathBuf) -> Result<CommandOutput, DefaultError> {
+            assert_eq!(p, &PathBuf::from("/storage"));
+            assert_eq!(c, "test-command");
+            Ok(CommandOutput {
+                status: 0,
+                stderr: "".to_string(),
+                stdout: "".to_string(),
+            })
+        }
+        let shell = ShellImpl {
+            config: &config,
+            executor: shell_command,
+            interactive_executor: executor,
+        };
+
+        let res = shell.execute_interactive_in_repo("test-command").unwrap();
+        assert_eq!(res.status, 0);
+        assert!(res.stderr.is_empty());
+        assert!(res.stdout.is_empty());
+    }
+
+    #[test]
+    pub fn execute_interactive_bad_command() {
+        let config = Config {
+            storage_directory: PathBuf::from("/storage"),
+            template_path: PathBuf::from("/template.md"),
+        };
+        fn executor(c: &str, p: &PathBuf) -> Result<CommandOutput, DefaultError> {
+            assert_eq!(p, &PathBuf::from("/storage"));
+            assert_eq!(c, "test-command");
+            Ok(CommandOutput {
+                status: 1,
+                stderr: "".to_string(),
+                stdout: "".to_string(),
+            })
+        }
+        let shell = ShellImpl {
+            config: &config,
+            executor: shell_command,
+            interactive_executor: executor,
+        };
+
+        let res = shell.execute_interactive_in_repo("test-command").unwrap_err();
+        assert_eq!(res.message, "Command failed: \'test-command\'\nExit code=\'1\'\n");
+    }
+
+    #[test]
+    pub fn execute_interactive_error() {
+        let config = Config {
+            storage_directory: PathBuf::from("/storage"),
+            template_path: PathBuf::from("/template.md"),
+        };
+        fn executor(c: &str, p: &PathBuf) -> Result<CommandOutput, DefaultError> {
+            assert_eq!(p, &PathBuf::from("/storage"));
+            assert_eq!(c, "test-command");
+            Err(DefaultError::new("test error".to_string()))
+        }
+        let shell = ShellImpl {
+            config: &config,
+            executor: shell_command,
+            interactive_executor: executor,
+        };
+
+        let res = shell.execute_interactive_in_repo("test-command").unwrap_err();
         assert_eq!(res.message, "test error");
     }
 }

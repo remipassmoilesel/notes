@@ -88,7 +88,7 @@ impl<'a> Repository for RepositoryImpl<'a> {
     fn edit_note(&self, note: &Note) -> Result<ConsoleOutput, DefaultError> {
         let mut out = ConsoleOutput::empty();
         let path = note.path.to_str().unwrap();
-        self.shell.execute_in_repo(format!("$EDITOR {}", path).as_str())?;
+        self.shell.execute_interactive_in_repo(format!("$EDITOR {}", path).as_str())?;
         let file_has_changed = self.git.has_changed(note);
         if file_has_changed {
             let message = format!("Update note {}", note.path.file_name().unwrap().to_str().unwrap());
@@ -266,7 +266,7 @@ mod tests {
 
         let exp_command = format!("$EDITOR {}", fake_note.path.to_str().unwrap());
         shell_mock
-            .expect_execute_in_repo()
+            .expect_execute_interactive_in_repo()
             .times(1)
             .withf(move |c| c == exp_command)
             .returning(|_| Ok(CommandOutput::default()));
@@ -307,7 +307,7 @@ mod tests {
 
         let exp_command = format!("$EDITOR {}", fake_note.path.to_str().unwrap());
         shell_mock
-            .expect_execute_in_repo()
+            .expect_execute_interactive_in_repo()
             .times(1)
             .withf(move |c| c == exp_command)
             .returning(|_| Ok(CommandOutput::default()));
