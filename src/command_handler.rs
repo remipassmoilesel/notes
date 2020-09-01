@@ -54,7 +54,7 @@ impl<'a> CommandHandler<'a> {
         let note = self.repository.new_note(id, &final_path)?;
         out.append(self.repository.edit_note(&note)?);
 
-        out.append_stdout(&format!("\nNote '{}' created\n", &final_path));
+        out.append_stdout(&format!("\nNote '{}' created\n", &note.path.to_str().unwrap()));
         Ok(out)
     }
 

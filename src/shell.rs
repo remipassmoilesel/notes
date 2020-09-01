@@ -76,7 +76,7 @@ impl<'a> Shell for ShellImpl<'a> {
         match (self.executor)(command, current_dir) {
             Ok(o) if o.status == 0 => Ok(o),
             Ok(o) if o.status != 0 => Err(DefaultError::new(format!(
-                "Command failed: '{}'\nExit code='{}'\nstdout='{}'\nstderr='{}'",
+                "Command failed: '{}'\n\n\tExit code: {}\n\tstdout: {}\n\tstderr: {}",
                 command, o.status, o.stdout, o.stderr
             ))),
             Ok(_) => Err(DefaultError::new(String::from("Unexpected return value"))),
@@ -91,7 +91,7 @@ impl<'a> Shell for ShellImpl<'a> {
     fn execute_interactive(&self, command: &str, current_dir: &PathBuf) -> Result<CommandOutput, DefaultError> {
         match (self.interactive_executor)(command, current_dir) {
             Ok(o) if o.status == 0 => Ok(o),
-            Ok(o) if o.status != 0 => Err(DefaultError::new(format!("Command failed: '{}'\nExit code='{}'\n", command, o.status))),
+            Ok(o) if o.status != 0 => Err(DefaultError::new(format!("Command failed: '{}'\n\n\tExit code: {}\n", command, o.status))),
             Ok(_) => Err(DefaultError::new(String::from("Unexpected return value"))),
             Err(e) => Err(e),
         }
@@ -146,8 +146,6 @@ pub fn command_interactive(command: &str, current_dir: &PathBuf) -> Result<Comma
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use super::*;
 
     #[test]
@@ -240,6 +238,7 @@ mod tests {
 
         let res = shell.execute_in_repo("test-command").unwrap_err();
         assert_eq!(res.message, "Command failed: \'test-command\'\nExit code=\'1\'\nstdout=\'out\'\nstderr=\'err\'");
+        print!("{}", res.message);
     }
 
     #[test]

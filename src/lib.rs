@@ -56,8 +56,8 @@ fn check_prerequisites() -> Result<(), DefaultError> {
     assert_exists("$EDITOR", "EDITOR variable must contains a valid text editor, e.g.:\n\n\texport EDITOR=vim")
 }
 
-fn assert_exists(command: &str, message: &str) -> Result<(), DefaultError> {
-    let cmd = command(format!("which {}", command).as_str(), &PathBuf::from("/"));
+fn assert_exists(cmd: &str, message: &str) -> Result<(), DefaultError> {
+    let cmd = command(format!("which {}", cmd).as_str(), &PathBuf::from("/"));
     match cmd {
         Ok(o) if o.status == 0 => Ok(()),
         Ok(o) if o.status != 0 => Err(DefaultError::new(message.to_string())),
