@@ -9,8 +9,6 @@ use crate::repository::Repository;
 use crate::search_match::SearchMatch;
 use crate::usage::usage;
 
-// TODO: better assertions on output
-
 #[derive(Debug, PartialEq)]
 pub enum Command {
     New { path: String },
@@ -147,6 +145,8 @@ impl<'a> CommandHandler<'a> {
         Ok(out)
     }
 }
+
+// TODO: better assertions on output
 
 #[cfg(test)]
 mod tests {
